@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay facilitator view 260908.1</title>
+<title>Relay facilitator view 260908.2</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
@@ -14,62 +14,85 @@
     --ink:#0E141B; --panel:#151D26; --panel-2:#1B2530; --rule:#26333F;
     --graphite:#8A9AAB; --paper:#E6EDF3; --amber:#E8A33D; --cyan:#4FB6C8;
     --green:#4FA557; --red:#D6453F; --violet:#9B8CE0;
+    --bg:#070B0F; --headbg:var(--ink); --failtext:#F0A7A3;
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     /* set by the density control */
     --rowpad:9px; --gap:26px;
+    /* every declared text size is a multiple of this */
+    --ts:1;
+    /* measured, because the sticky column headings sit below the bar and the
+       bar's own height changes with the text size */
+    --headh:57px;
+  }
+
+  /* Dark text on white. Not an inversion: the accent colours that carry status
+     were chosen for a dark ground and are far too pale on white, so each has a
+     darker counterpart here. The greys are re-picked rather than flipped, so
+     secondary text stays legibly secondary instead of becoming faint grey on
+     white. */
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --ink:#F4F7FA; --headbg:#F4F7FA;
+    --panel:#EFF3F7; --panel-2:#E4EBF1; --rule:#C7D2DC;
+    --graphite:#54626F; --paper:#0F1519;
+    --amber:#8A5A05; --cyan:#0B6A7A; --green:#256E2A; --red:#A8221B;
+    --violet:#4F3FB8; --failtext:#A8221B;
   }
   *{box-sizing:border-box}
-  body{margin:0; background:#070B0F; color:var(--paper); font-family:var(--sans);
-       -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.45}
+  body{margin:0; background:var(--bg); color:var(--paper); font-family:var(--sans);
+       -webkit-font-smoothing:antialiased; font-size:calc(15px * var(--ts)); line-height:1.45}
 
   /* ---------- the bar that stays put ---------- */
-  header{position:sticky; top:0; z-index:10; background:var(--ink);
+  header{position:sticky; top:0; z-index:10; background:var(--headbg);
          border-bottom:1px solid var(--rule); padding:12px 20px}
   .barrow{display:flex; align-items:center; gap:14px; flex-wrap:wrap;
           max-width:1180px; margin:0 auto}
-  h1{margin:0; font-size:16px; font-weight:650; letter-spacing:.01em; white-space:nowrap}
-  h1 em{font-style:normal; color:var(--graphite); font-weight:400; font-size:13px}
-  .readonly{font-family:var(--mono); font-size:11px; color:var(--graphite);
+  h1{margin:0; font-size:calc(16px * var(--ts)); font-weight:650; letter-spacing:.01em; white-space:nowrap}
+  h1 em{font-style:normal; color:var(--graphite); font-weight:400; font-size:calc(13px * var(--ts))}
+  .readonly{font-family:var(--mono); font-size:calc(11px * var(--ts)); color:var(--graphite);
             border:1px solid var(--rule); border-radius:3px; padding:2px 7px}
   .spacer{flex:1 1 auto}
 
-  label.field{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--graphite)}
-  input#sess{font-family:var(--mono); font-size:15px; letter-spacing:.14em;
+  label.field{display:flex; align-items:center; gap:8px; font-size:calc(13px * var(--ts)); color:var(--graphite)}
+  input#sess{font-family:var(--mono); font-size:calc(15px * var(--ts)); letter-spacing:.14em;
              text-transform:uppercase; width:9ch; background:var(--panel);
              color:var(--paper); border:1px solid var(--rule); border-radius:3px;
              padding:6px 9px}
   input#sess:focus{outline:2px solid var(--cyan); outline-offset:1px}
-  .btn{font-family:var(--mono); font-size:12px; letter-spacing:.1em;
+  .btn{font-family:var(--mono); font-size:calc(12px * var(--ts)); letter-spacing:.1em;
        text-transform:uppercase; background:var(--panel); color:var(--paper);
        border:1px solid var(--rule); border-radius:3px; padding:6px 11px;
        cursor:pointer}
   .btn:hover{border-color:var(--graphite)}
-  .btn.on{background:var(--cyan); border-color:var(--cyan); color:var(--ink); font-weight:650}
+  /* the label sits on the accent, so it takes the page's own ground colour:
+     dark on bright cyan in the dark palette, white on deep cyan in the light */
+  .btn.on{background:var(--cyan); border-color:var(--cyan); color:var(--bg); font-weight:650}
   .btn:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
-  .netstate{font-family:var(--mono); font-size:11px; color:var(--green)}
+  .btn:disabled{opacity:.35; cursor:default}
+  .btn:disabled:hover{border-color:var(--rule)}
+  .netstate{font-family:var(--mono); font-size:calc(11px * var(--ts)); color:var(--green)}
   .netstate.off{color:var(--amber)}
 
   /* ---------- the glance ---------- */
   main{max-width:1180px; margin:0 auto; padding:0 20px 80px}
-  .glance{padding:22px 0 6px; font-size:22px; font-weight:400; line-height:1.35;
+  .glance{padding:22px 0 6px; font-size:calc(22px * var(--ts)); font-weight:400; line-height:1.35;
           color:var(--graphite)}
   .glance b{color:var(--paper); font-weight:650; font-variant-numeric:tabular-nums}
   .glance .live{color:var(--cyan)}
 
   section{margin-top:var(--gap)}
-  h2{margin:0 0 3px; font-size:15px; font-weight:650}
+  h2{margin:0 0 3px; font-size:calc(15px * var(--ts)); font-weight:650}
   h2 span{color:var(--graphite); font-weight:400}
-  .subhead{margin:0 0 9px; font-size:13px; color:var(--graphite)}
+  .subhead{margin:0 0 9px; font-size:calc(13px * var(--ts)); color:var(--graphite)}
 
-  table{width:100%; border-collapse:collapse; font-size:14px}
+  table{width:100%; border-collapse:collapse; font-size:calc(14px * var(--ts))}
   caption{caption-side:top; text-align:left}
   th,td{text-align:left; padding:var(--rowpad) 11px; border-bottom:1px solid var(--rule);
         vertical-align:baseline}
-  thead th{font-family:var(--mono); font-size:11px; letter-spacing:.09em;
+  thead th{font-family:var(--mono); font-size:calc(11px * var(--ts)); letter-spacing:.09em;
            color:var(--graphite); font-weight:400; border-bottom:1px solid var(--graphite);
            white-space:nowrap; cursor:pointer; user-select:none;
-           position:sticky; top:57px; background:#070B0F}
+           position:sticky; top:var(--headh); background:var(--bg)}
   thead th:hover{color:var(--paper)}
   thead th[aria-sort]{color:var(--paper)}
   thead th .arrow{color:var(--cyan)}
@@ -77,7 +100,7 @@
   td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
   td.code{font-family:var(--mono); letter-spacing:.1em; white-space:nowrap}
   td.dim{color:var(--graphite)}
-  .pill{display:inline-block; font-family:var(--mono); font-size:11px;
+  .pill{display:inline-block; font-family:var(--mono); font-size:calc(11px * var(--ts));
         letter-spacing:.06em; border:1px solid var(--rule); border-radius:9px;
         padding:1px 9px; white-space:nowrap}
   .pill.live{border-color:var(--cyan); color:var(--cyan)}
@@ -86,19 +109,19 @@
   .score{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
   .score.good{color:var(--green)}
   .score.none{color:var(--graphite)}
-  .empty{padding:14px 11px; color:var(--graphite); font-size:14px;
+  .empty{padding:14px 11px; color:var(--graphite); font-size:calc(14px * var(--ts));
          border-bottom:1px solid var(--rule)}
   .fail{margin:22px 0; padding:14px 16px; border:1px solid var(--red);
-        border-left-width:3px; border-radius:3px; color:#F0A7A3; font-size:14px}
-  .fail code{font-family:var(--mono); font-size:13px; color:var(--paper)}
+        border-left-width:3px; border-radius:3px; color:var(--failtext); font-size:calc(14px * var(--ts))}
+  .fail code{font-family:var(--mono); font-size:calc(13px * var(--ts)); color:var(--paper)}
   footer{max-width:1180px; margin:0 auto; padding:0 20px 40px;
-         color:var(--graphite); font-size:13px}
+         color:var(--graphite); font-size:calc(13px * var(--ts))}
 </style>
 </head>
 <body>
 <header>
   <div class="barrow">
-    <h1>Relay <em>facilitator view 260908.1</em></h1>
+    <h1>Relay <em>facilitator view 260908.2</em></h1>
     <span class="readonly">read only</span>
     <label class="field" for="sess">Session
       <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
@@ -107,6 +130,11 @@
     <button class="btn" id="bKravis">Kravis</button>
     <button class="btn" id="bAdhoc">Adhoc</button>
     <span class="spacer"></span>
+    <button class="btn" id="bTheme">Light</button>
+    <label class="field">Text
+      <button class="btn" id="tsDown" aria-label="Smaller text">&minus;</button>
+      <button class="btn" id="tsUp" aria-label="Larger text">+</button>
+    </label>
     <label class="field">Rows
       <button class="btn" id="dTight">Tight</button>
       <button class="btn" id="dMed">Medium</button>
@@ -594,6 +622,52 @@
   document.getElementById("bKravis").onclick = function(){ setSession("KRAVIS"); };
   document.getElementById("bAdhoc").onclick  = function(){ setSession("ADHOC"); };
 
+  /* ---------- how the page reads ----------
+     Dark on light and light on dark are not equally readable to everyone, and
+     neither is one text size. Both are remembered per browser, so a
+     facilitator sets them once. Nothing here touches the data. */
+  var head = document.querySelector("header");
+  function measureHead(){
+    /* the column headings stick below the bar, so they need its real height */
+    if (head) document.documentElement.style.setProperty("--headh", head.offsetHeight + "px");
+  }
+  window.addEventListener("resize", measureHead);
+
+  var themeBtn = document.getElementById("bTheme");
+  function theme(mode){
+    if (mode === "light") document.documentElement.setAttribute("data-theme","light");
+    else document.documentElement.removeAttribute("data-theme");
+    /* the button offers the other one, rather than naming the current one */
+    themeBtn.textContent = (mode === "light") ? "Dark" : "Light";
+    themeBtn.setAttribute("aria-label",
+      (mode === "light") ? "Switch to light text on a dark background"
+                         : "Switch to dark text on a white background");
+    try { localStorage.setItem("relay.admin.theme", mode); } catch(e){}
+    measureHead();
+  }
+  var savedTheme = "dark";
+  try { savedTheme = localStorage.getItem("relay.admin.theme") || "dark"; } catch(e){}
+  theme(savedTheme === "light" ? "light" : "dark");
+  themeBtn.onclick = function(){
+    theme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+  };
+
+  var STEPS = [0.9, 1, 1.15, 1.3, 1.5, 1.75, 2], tsIx = 1;
+  function textSize(){
+    document.documentElement.style.setProperty("--ts", String(STEPS[tsIx]));
+    document.getElementById("tsDown").disabled = (tsIx === 0);
+    document.getElementById("tsUp").disabled = (tsIx === STEPS.length - 1);
+    try { localStorage.setItem("relay.admin.ts", String(STEPS[tsIx])); } catch(e){}
+    measureHead();
+  }
+  try {
+    var at = STEPS.indexOf(parseFloat(localStorage.getItem("relay.admin.ts")));
+    if (at >= 0) tsIx = at;
+  } catch(e){}
+  document.getElementById("tsUp").onclick   = function(){ if (tsIx < STEPS.length-1){ tsIx++; textSize(); } };
+  document.getElementById("tsDown").onclick = function(){ if (tsIx > 0){ tsIx--; textSize(); } };
+  textSize();
+
   var DENS = {
     dTight: { rowpad:"4px",  gap:"18px" },
     dMed:   { rowpad:"9px",  gap:"26px" },
@@ -607,6 +681,7 @@
       document.getElementById(k).classList.toggle("on", k === which);
     });
     try { localStorage.setItem("relay.admin.density", which); } catch(e){}
+    measureHead();
   }
   Object.keys(DENS).forEach(function(k){
     document.getElementById(k).onclick = function(){ density(k); };
