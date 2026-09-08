@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay facilitator view 260908.1</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  /* The game's own tokens. This is a companion to it, not a separate product,
+     and a facilitator glancing between the two should not have to re-learn
+     what a colour means. */
+  :root{
+    --ink:#0E141B; --panel:#151D26; --panel-2:#1B2530; --rule:#26333F;
+    --graphite:#8A9AAB; --paper:#E6EDF3; --amber:#E8A33D; --cyan:#4FB6C8;
+    --green:#4FA557; --red:#D6453F; --violet:#9B8CE0;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* set by the density control */
+    --rowpad:9px; --gap:26px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:#070B0F; color:var(--paper); font-family:var(--sans);
+       -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.45}
+
+  /* ---------- the bar that stays put ---------- */
+  header{position:sticky; top:0; z-index:10; background:var(--ink);
+         border-bottom:1px solid var(--rule); padding:12px 20px}
+  .barrow{display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+          max-width:1180px; margin:0 auto}
+  h1{margin:0; font-size:16px; font-weight:650; letter-spacing:.01em; white-space:nowrap}
+  h1 em{font-style:normal; color:var(--graphite); font-weight:400; font-size:13px}
+  .readonly{font-family:var(--mono); font-size:11px; color:var(--graphite);
+            border:1px solid var(--rule); border-radius:3px; padding:2px 7px}
+  .spacer{flex:1 1 auto}
+
+  label.field{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--graphite)}
+  input#sess{font-family:var(--mono); font-size:15px; letter-spacing:.14em;
+             text-transform:uppercase; width:9ch; background:var(--panel);
+             color:var(--paper); border:1px solid var(--rule); border-radius:3px;
+             padding:6px 9px}
+  input#sess:focus{outline:2px solid var(--cyan); outline-offset:1px}
+  .btn{font-family:var(--mono); font-size:12px; letter-spacing:.1em;
+       text-transform:uppercase; background:var(--panel); color:var(--paper);
+       border:1px solid var(--rule); border-radius:3px; padding:6px 11px;
+       cursor:pointer}
+  .btn:hover{border-color:var(--graphite)}
+  .btn.on{background:var(--cyan); border-color:var(--cyan); color:var(--ink); font-weight:650}
+  .btn:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
+  .netstate{font-family:var(--mono); font-size:11px; color:var(--green)}
+  .netstate.off{color:var(--amber)}
+
+  /* ---------- the glance ---------- */
+  main{max-width:1180px; margin:0 auto; padding:0 20px 80px}
+  .glance{padding:22px 0 6px; font-size:22px; font-weight:400; line-height:1.35;
+          color:var(--graphite)}
+  .glance b{color:var(--paper); font-weight:650; font-variant-numeric:tabular-nums}
+  .glance .live{color:var(--cyan)}
+
+  section{margin-top:var(--gap)}
+  h2{margin:0 0 3px; font-size:15px; font-weight:650}
+  h2 span{color:var(--graphite); font-weight:400}
+  .subhead{margin:0 0 9px; font-size:13px; color:var(--graphite)}
+
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  caption{caption-side:top; text-align:left}
+  th,td{text-align:left; padding:var(--rowpad) 11px; border-bottom:1px solid var(--rule);
+        vertical-align:baseline}
+  thead th{font-family:var(--mono); font-size:11px; letter-spacing:.09em;
+           color:var(--graphite); font-weight:400; border-bottom:1px solid var(--graphite);
+           white-space:nowrap; cursor:pointer; user-select:none;
+           position:sticky; top:57px; background:#070B0F}
+  thead th:hover{color:var(--paper)}
+  thead th[aria-sort]{color:var(--paper)}
+  thead th .arrow{color:var(--cyan)}
+  tbody tr:hover{background:var(--panel)}
+  td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+  td.code{font-family:var(--mono); letter-spacing:.1em; white-space:nowrap}
+  td.dim{color:var(--graphite)}
+  .pill{display:inline-block; font-family:var(--mono); font-size:11px;
+        letter-spacing:.06em; border:1px solid var(--rule); border-radius:9px;
+        padding:1px 9px; white-space:nowrap}
+  .pill.live{border-color:var(--cyan); color:var(--cyan)}
+  .pill.done{border-color:var(--rule); color:var(--graphite)}
+  .pill.lobby{border-color:var(--amber); color:var(--amber)}
+  .score{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .score.good{color:var(--green)}
+  .score.none{color:var(--graphite)}
+  .empty{padding:14px 11px; color:var(--graphite); font-size:14px;
+         border-bottom:1px solid var(--rule)}
+  .fail{margin:22px 0; padding:14px 16px; border:1px solid var(--red);
+        border-left-width:3px; border-radius:3px; color:#F0A7A3; font-size:14px}
+  .fail code{font-family:var(--mono); font-size:13px; color:var(--paper)}
+  footer{max-width:1180px; margin:0 auto; padding:0 20px 40px;
+         color:var(--graphite); font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="barrow">
+    <h1>Relay <em>facilitator view 260908.1</em></h1>
+    <span class="readonly">read only</span>
+    <label class="field" for="sess">Session
+      <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
+             aria-label="Session code">
+    </label>
+    <button class="btn" id="bKravis">Kravis</button>
+    <button class="btn" id="bAdhoc">Adhoc</button>
+    <span class="spacer"></span>
+    <label class="field">Rows
+      <button class="btn" id="dTight">Tight</button>
+      <button class="btn" id="dMed">Medium</button>
+      <button class="btn" id="dWide">Wide</button>
+    </label>
+    <span class="netstate" id="net">connecting</span>
+  </div>
+</header>
+
+<main id="main"></main>
+<footer id="foot"></footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ==========================================================
+     1. THE DATABASE, READ ONLY
+
+     This page never writes. There is no set, update, push or transaction
+     anywhere in it, on purpose: a facilitator's dashboard that can alter a
+     live round is a hazard, not a tool. It subscribes to two places and
+     redraws when either changes.
+     ========================================================== */
+  var FB_CONFIG = {
+    apiKey: "AIzaSyC-NH6Ov7sbrJN0mM54qIhRTsjl1Bj7LbQ",
+    authDomain: "relay-1b018.firebaseapp.com",
+    databaseURL: "https://relay-1b018-default-rtdb.firebaseio.com",
+    projectId: "relay-1b018",
+    storageBucket: "relay-1b018.firebasestorage.app",
+    messagingSenderId: "809917904513",
+    appId: "1:809917904513:web:201f6cef9b29a6a343ff80"
+  };
+
+  var LEVELS = {
+    L1: { n:1, name:"Onboarding" },
+    L2: { n:2, name:"Basic Building" },
+    L3: { n:3, name:"Tougher Challenge" }
+  };
+
+  var TEAMS = null, ROUNDS = null, FAILURE = null;
+  var main = document.getElementById("main"), foot = document.getElementById("foot");
+
+  /* ==========================================================
+     2. READING WHAT THE GAME WROTE
+
+     The game stores its live state as JSON strings under each team, because
+     Firebase deletes anything written as null and would otherwise lose the
+     difference between "unlimited" and "not set". So most of what looks like
+     structure here has to be parsed rather than read.
+     ========================================================== */
+  function JP(t, dflt){
+    if (t === undefined || t === null) return dflt;
+    if (typeof t !== "string") return t;
+    try { var v = JSON.parse(t); return v === null ? dflt : v; }
+    catch(e){ return dflt; }
+  }
+  /* Firebase hands entries numbered 0..n back as an array, and objects
+     otherwise, so a deck can arrive either way. */
+  function listOf(v){
+    if (!v) return [];
+    if (Array.isArray(v)) return v.filter(function(x){ return !!x; });
+    return Object.keys(v).map(Number).sort(function(a,b){ return a-b; })
+      .map(function(k){ return v[k]; });
+  }
+  /* A round id is "r-" plus the moment it was dealt, in base 36. That is the
+     only start time available for a round read from /rounds, and it is exact. */
+  function idTime(id){
+    if (!id || id.indexOf("r-") !== 0) return null;
+    var t = parseInt(id.slice(2), 36);
+    return (isFinite(t) && t > 1e12) ? t : null;
+  }
+
+  function clock(ms){
+    if (!ms) return "—";
+    var d = new Date(ms);
+    return String(d.getHours()).padStart(2,"0") + ":" +
+           String(d.getMinutes()).padStart(2,"0") + ":" +
+           String(d.getSeconds()).padStart(2,"0");
+  }
+  function dur(ms){
+    if (ms === null || ms === undefined || ms < 0) return "—";
+    var s = Math.round(ms/1000);
+    return Math.floor(s/60) + ":" + String(s % 60).padStart(2,"0");
+  }
+  function lvName(id){
+    var lv = LEVELS[id];
+    return lv ? ("Level " + lv.n) : (id || "?");
+  }
+
+  /* ---------- teams ---------- */
+  function readTeams(session){
+    var out = [];
+    Object.keys(TEAMS || {}).forEach(function(code){
+      var node = TEAMS[code];
+      if (!node || !node.state) return;
+      if (node.session !== session) return;
+      var st = node.state;
+      var team = JP(st.team, null) || {};
+      var finished = JP(st.finished, []) || [];
+      var round = (st.round && !st.round.none) ? st.round : null;
+      var warm = st.warmup && st.warmup.on;
+      var roundNo = finished.length + 1;
+
+      var status, cls;
+      if (!team.guest){ status = "Waiting for a teammate"; cls = "lobby"; }
+      else if (st.phase === "lobby"){ status = "In lobby"; cls = "lobby"; }
+      else if (st.phase === "warmup" && round){
+        status = "Warm-up (" + lvName(round.levelId) + ")"; cls = "live";
+      }
+      else if (st.phase === "play" && round){
+        status = "Round " + roundNo + " (" + lvName(round.levelId) + ")";
+        if (!round.coachDone) status += ", reading the notes";
+        cls = "live";
+      }
+      else if (st.phase === "review" && round){
+        status = "Debrief, round " + roundNo + " (" + lvName(round.levelId) + ")";
+        cls = "done";
+      }
+      else { status = st.phase || "unknown"; cls = "done"; }
+
+      out.push({
+        code: node.code || code,
+        createdAt: node.createdAt || 0,
+        host: (team.host && team.host.name) || "—",
+        guest: (team.guest && team.guest.name) || "—",
+        status: status, statusClass: cls,
+        done: finished.length,
+        build: node.build || "—",
+        live: cls === "live"
+      });
+    });
+    return out;
+  }
+
+  /* ---------- rounds ----------
+     Two sources, and they hold different things. A team's own state has the
+     round in progress and every round it has archived, with real wall-clock
+     times. /rounds has the verdicts, which cannot be worked out here — scoring
+     a build needs the comparison logic and the design library. So rounds are
+     gathered from the teams and then given their scores from /rounds. */
+  function readRounds(session){
+    var byId = {};
+
+    /* A round can be described twice: once by the team that played it, once
+       by the score record written when it ended. The team's account has the
+       real wall-clock times; the score record's start time is only inferred
+       from the round id. So the score record FILLS what is missing rather than
+       overwriting what is already known. */
+    function put(r, fillOnly){
+      if (!r || !r.id) return;
+      var prev = byId[r.id];
+      if (!prev){ byId[r.id] = r; return; }
+      Object.keys(r).forEach(function(k){
+        var v = r[k];
+        if (v === undefined || v === null) return;
+        if (fillOnly && prev[k] !== undefined && prev[k] !== null) return;
+        prev[k] = v;
+      });
+    }
+
+    Object.keys(TEAMS || {}).forEach(function(code){
+      var node = TEAMS[code];
+      if (!node || !node.state || node.session !== session) return;
+      var st = node.state;
+      var team = JP(st.team, null) || {};
+      var tcode = node.code || code;
+
+      /* rounds this team has finished with and left */
+      (JP(st.finished, []) || []).forEach(function(r){
+        if (!r || !r.id) return;
+        put({
+          id: r.id, levelId: r.levelId, team: tcode,
+          host: (team.host && team.host.name) || "—",
+          guest: (team.guest && team.guest.name) || "—",
+          startedAt: r.startedAt || idTime(r.id),
+          endedAt: r.endedAt || null,
+          elapsedMs: r.elapsedMs === undefined ? null : r.elapsedMs,
+          endedBy: r.endedBy || null,
+          deckSize: (r.deck || []).length,
+          live: false
+        });
+      });
+
+      /* and the one it is on now, which may be in play or in the debrief */
+      var round = (st.round && !st.round.none) ? st.round : null;
+      if (round){
+        var deck = listOf(round.deck);
+        var ended = !!(round.endedBy && round.endedBy !== "");
+        put({
+          id: round.id, levelId: round.levelId, team: tcode,
+          host: (team.host && team.host.name) || "—",
+          guest: (team.guest && team.guest.name) || "—",
+          startedAt: round.startedAt || idTime(round.id),
+          endedAt: (round.endedAt && round.endedAt !== -1) ? round.endedAt : null,
+          elapsedMs: ended ? round.elapsedMs : null,
+          endedBy: ended ? round.endedBy : null,
+          deckSize: deck.length,
+          live: !ended,
+          /* while a round is running, how many are in is knowable here; how
+             many are RIGHT is not, because that needs the comparison logic */
+          partialSubmitted: deck.filter(function(e){ return !!e.submitted; }).length,
+          partialOpened: deck.filter(function(e){ return !!e.architectOpened; }).length
+        });
+      }
+    });
+
+    /* the scores, from the records the game writes when a round ends */
+    Object.keys(ROUNDS || {}).forEach(function(key){
+      var rec = ROUNDS[key];
+      if (!rec || !rec.round || rec.session !== session) return;
+      var t = rec.totals || {};
+      put({
+        id: rec.round.id, levelId: rec.round.levelId,
+        team: (rec.team && rec.team.code) || "—",
+        host: (rec.team && rec.team.players && rec.team.players.host) || "—",
+        guest: (rec.team && rec.team.players && rec.team.players.guest) || "—",
+        startedAt: idTime(rec.round.id),
+        elapsedMs: rec.round.elapsedMs === undefined ? null : rec.round.elapsedMs,
+        endedBy: rec.round.endedBy || null,
+        deckSize: (rec.designs || []).length,
+        correct: t.correct, submitted: t.submitted,
+        openedNotSubmitted: t.openedNotSubmitted, neverOpened: t.neverOpened,
+        scored: true
+      }, true);
+    });
+
+    return Object.keys(byId).map(function(k){
+      var r = byId[k];
+      /* a round that has a score is finished, whatever else we were told */
+      if (r.scored) r.live = false;
+      if (r.endedAt === undefined) r.endedAt = null;
+      /* the end time is not in the score record, so work it back from the
+         start and the duration when that is all there is */
+      if (!r.endedAt && r.startedAt && r.elapsedMs) r.endedAt = r.startedAt + r.elapsedMs;
+      return r;
+    });
+  }
+
+  /* ==========================================================
+     3. TABLES
+     ========================================================== */
+  var sortState = {};
+
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+
+  function table(key, cols, rows, emptyMsg){
+    var st = sortState[key] || (sortState[key] = { col:cols.defaultCol, dir:cols.defaultDir || 1 });
+    var t = el("table");
+
+    var thead = el("thead"), tr = el("tr");
+    cols.list.forEach(function(c){
+      var th = el("th");
+      th.appendChild(document.createTextNode(c.head));
+      if (st.col === c.key){
+        th.setAttribute("aria-sort", st.dir > 0 ? "ascending" : "descending");
+        var a = el("span","arrow", st.dir > 0 ? " \u2191" : " \u2193");
+        th.appendChild(a);
+      }
+      th.tabIndex = 0;
+      th.title = "Sort by " + c.head.toLowerCase();
+      var go = function(){
+        if (st.col === c.key) st.dir = -st.dir;
+        else { st.col = c.key; st.dir = c.desc ? -1 : 1; }
+        draw();
+      };
+      th.onclick = go;
+      th.onkeydown = function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } };
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr); t.appendChild(thead);
+
+    var body = el("tbody");
+    if (!rows.length){
+      var trE = el("tr"), tdE = el("td","empty", emptyMsg);
+      tdE.colSpan = cols.list.length;
+      trE.appendChild(tdE); body.appendChild(trE);
+    } else {
+      var col = cols.list.filter(function(c){ return c.key === st.col; })[0] || cols.list[0];
+      rows.slice().sort(function(a,b){
+        var x = col.sortVal ? col.sortVal(a) : 0, y = col.sortVal ? col.sortVal(b) : 0;
+        if (x === y) return 0;
+        if (x === null || x === undefined) return 1;
+        if (y === null || y === undefined) return -1;
+        return (x > y ? 1 : -1) * st.dir;
+      }).forEach(function(r){
+        var row = el("tr");
+        cols.list.forEach(function(c){ row.appendChild(c.cell(r)); });
+        body.appendChild(row);
+      });
+    }
+    t.appendChild(body);
+    return t;
+  }
+
+  function pill(text, cls){
+    var td = el("td");
+    td.appendChild(el("span", "pill " + cls, text));
+    return td;
+  }
+  function num(text){ return el("td","num", text); }
+
+  var TEAM_COLS = {
+    defaultCol: "createdAt", defaultDir: 1,
+    list: [
+      { head:"Started", key:"createdAt", sortVal:function(r){ return r.createdAt; },
+        cell:function(r){ return num(clock(r.createdAt)); } },
+      { head:"Team", key:"code", sortVal:function(r){ return r.code; },
+        cell:function(r){ return el("td","code", r.code); } },
+      { head:"Architect or Builder first", key:"host", sortVal:function(r){ return r.host; },
+        cell:function(r){ return el("td","", r.host); } },
+      { head:"Teammate", key:"guest", sortVal:function(r){ return r.guest; },
+        cell:function(r){ return el("td", r.guest === "—" ? "dim" : "", r.guest); } },
+      { head:"Where they are", key:"status", sortVal:function(r){ return r.status; },
+        cell:function(r){ return pill(r.status, r.statusClass); } },
+      { head:"Rounds done", key:"done", desc:true, sortVal:function(r){ return r.done; },
+        cell:function(r){ return num(r.done || "0"); } },
+      { head:"Build", key:"build", sortVal:function(r){ return r.build; },
+        cell:function(r){ return el("td","num dim", r.build); } }
+    ]
+  };
+
+  function scoreCell(r, field, goodWhenAll){
+    var v = r[field];
+    if (v === undefined || v === null){
+      /* a round still running has no score. Say so rather than showing a zero
+         that reads like a result. */
+      if (r.live && field === "submitted" && r.partialSubmitted !== undefined)
+        return el("td","score", r.partialSubmitted + " so far");
+      return el("td","score none","—");
+    }
+    var td = el("td","score" + (goodWhenAll && v === r.deckSize ? " good" : ""), String(v));
+    return td;
+  }
+
+  var ROUND_COLS = {
+    defaultCol: "startedAt", defaultDir: 1,
+    list: [
+      { head:"Started", key:"startedAt", sortVal:function(r){ return r.startedAt; },
+        cell:function(r){ return num(clock(r.startedAt)); } },
+      { head:"Team", key:"team", sortVal:function(r){ return r.team; },
+        cell:function(r){ return el("td","code", r.team); } },
+      { head:"Status", key:"live", sortVal:function(r){ return r.live ? 0 : 1; },
+        cell:function(r){
+          return r.live ? pill("Playing","live")
+                        : pill(r.endedBy ? "Finished" : "Left", "done");
+        } },
+      { head:"Ended", key:"endedAt", sortVal:function(r){ return r.endedAt; },
+        cell:function(r){ return num(r.live ? "—" : clock(r.endedAt)); } },
+      { head:"Took", key:"elapsedMs", desc:true, sortVal:function(r){ return r.elapsedMs; },
+        cell:function(r){ return num(r.live ? "running" : dur(r.elapsedMs)); } },
+      { head:"Designs", key:"deckSize", sortVal:function(r){ return r.deckSize; },
+        cell:function(r){ return el("td","num dim", String(r.deckSize || "—")); } },
+      { head:"Right", key:"correct", desc:true, sortVal:function(r){ return r.correct; },
+        cell:function(r){ return scoreCell(r, "correct", true); } },
+      { head:"Submitted", key:"submitted", desc:true, sortVal:function(r){ return r.submitted; },
+        cell:function(r){ return scoreCell(r, "submitted", true); } },
+      { head:"Looked at, not built", key:"openedNotSubmitted", desc:true,
+        sortVal:function(r){ return r.openedNotSubmitted; },
+        cell:function(r){ return scoreCell(r, "openedNotSubmitted"); } },
+      { head:"Never opened", key:"neverOpened", desc:true,
+        sortVal:function(r){ return r.neverOpened; },
+        cell:function(r){ return scoreCell(r, "neverOpened"); } }
+    ]
+  };
+
+  /* ==========================================================
+     4. DRAW
+     ========================================================== */
+  function session(){ return (document.getElementById("sess").value || "").trim().toUpperCase(); }
+
+  function draw(){
+    main.innerHTML = ""; foot.innerHTML = "";
+
+    if (FAILURE){
+      var f = el("div","fail");
+      f.appendChild(document.createTextNode("Could not read the database. "));
+      f.appendChild(el("code", null, FAILURE));
+      f.appendChild(el("div", null,
+        "If that mentions permission, the security rules have expired \u2014 " +
+        "check the Rules tab in the Firebase console."));
+      main.appendChild(f);
+      return;
+    }
+
+    var sess = session();
+    if (!sess){
+      main.appendChild(el("div","glance","Type a session code above, or press Kravis or Adhoc."));
+      return;
+    }
+    if (TEAMS === null){
+      main.appendChild(el("div","glance","Reading\u2026"));
+      return;
+    }
+
+    var teams = readTeams(sess);
+    var rounds = readRounds(sess);
+    var playing = teams.filter(function(t){ return t.live; }).length;
+    var doneRounds = rounds.filter(function(r){ return !r.live; }).length;
+    var liveRounds = rounds.filter(function(r){ return r.live; }).length;
+
+    /* The one thing a facilitator crossing the room wants: is everyone in, and
+       is everyone moving. */
+    var g = el("div","glance");
+    if (!teams.length){
+      g.appendChild(document.createTextNode("No teams in session " + sess + " yet."));
+    } else {
+      g.appendChild(el("b", null, String(teams.length)));
+      g.appendChild(document.createTextNode(teams.length === 1 ? " team in " : " teams in "));
+      g.appendChild(el("b", null, sess));
+      g.appendChild(document.createTextNode(". "));
+      var b1 = el("b","live", String(playing));
+      g.appendChild(b1);
+      g.appendChild(document.createTextNode(playing === 1 ? " is playing, " : " are playing, "));
+      g.appendChild(el("b", null, String(doneRounds)));
+      g.appendChild(document.createTextNode(doneRounds === 1 ? " round finished." : " rounds finished."));
+      if (liveRounds) g.appendChild(document.createTextNode(" " + liveRounds + " in progress."));
+    }
+    main.appendChild(g);
+
+    /* teams */
+    var s1 = el("section");
+    s1.appendChild(el("h2","Teams"));
+    s1.appendChild(el("p","subhead",
+      "Everyone who has made or joined a team in this session."));
+    s1.appendChild(table("teams", TEAM_COLS, teams,
+      "Nobody has made a team in " + sess + " yet."));
+    main.appendChild(s1);
+
+    /* one table per level */
+    ["L1","L2","L3"].forEach(function(id){
+      var lv = LEVELS[id];
+      var rows = rounds.filter(function(r){ return r.levelId === id; });
+      var sec = el("section");
+      var h = el("h2");
+      h.appendChild(document.createTextNode("Level " + lv.n + " "));
+      h.appendChild(el("span", null, lv.name));
+      sec.appendChild(h);
+      sec.appendChild(el("p","subhead",
+        rows.length === 1 ? "1 round" : rows.length + " rounds"));
+      sec.appendChild(table("lv" + id, ROUND_COLS, rows,
+        "No Level " + lv.n + " rounds in " + sess + " yet."));
+      main.appendChild(sec);
+    });
+
+    var orphans = rounds.filter(function(r){ return !LEVELS[r.levelId]; });
+    if (orphans.length){
+      var so = el("section");
+      so.appendChild(el("h2","Rounds at an unknown level"));
+      so.appendChild(el("p","subhead",
+        "These name a level this page does not know about, which means the game " +
+        "has moved on and this page has not."));
+      so.appendChild(table("orph", ROUND_COLS, orphans, ""));
+      main.appendChild(so);
+    }
+
+    foot.appendChild(document.createTextNode(
+      "Times are this computer's clock. \u201cTook\u201d is the round's own timer, " +
+      "which starts when both players have finished reading their notes. " +
+      "Scores appear once a round ends."));
+  }
+
+  /* ==========================================================
+     5. CONTROLS AND SUBSCRIPTIONS
+     ========================================================== */
+  var sessEl = document.getElementById("sess");
+  function setSession(v){
+    sessEl.value = v;
+    try { localStorage.setItem("relay.admin.session", v); } catch(e){}
+    draw();
+  }
+  try {
+    var saved = localStorage.getItem("relay.admin.session");
+    if (saved) sessEl.value = saved;
+  } catch(e){}
+  sessEl.oninput = function(){
+    try { localStorage.setItem("relay.admin.session", session()); } catch(e){}
+    draw();
+  };
+  document.getElementById("bKravis").onclick = function(){ setSession("KRAVIS"); };
+  document.getElementById("bAdhoc").onclick  = function(){ setSession("ADHOC"); };
+
+  var DENS = {
+    dTight: { rowpad:"4px",  gap:"18px" },
+    dMed:   { rowpad:"9px",  gap:"26px" },
+    dWide:  { rowpad:"15px", gap:"40px" }
+  };
+  function density(which){
+    var d = DENS[which];
+    document.documentElement.style.setProperty("--rowpad", d.rowpad);
+    document.documentElement.style.setProperty("--gap", d.gap);
+    Object.keys(DENS).forEach(function(k){
+      document.getElementById(k).classList.toggle("on", k === which);
+    });
+    try { localStorage.setItem("relay.admin.density", which); } catch(e){}
+  }
+  Object.keys(DENS).forEach(function(k){
+    document.getElementById(k).onclick = function(){ density(k); };
+  });
+  var savedD = "dMed";
+  try { savedD = localStorage.getItem("relay.admin.density") || "dMed"; } catch(e){}
+  density(DENS[savedD] ? savedD : "dMed");
+
+  firebase.initializeApp(FB_CONFIG);
+  var DB = firebase.database();
+
+  var net = document.getElementById("net");
+  DB.ref("/.info/connected").on("value", function(sn){
+    var on = !!sn.val();
+    net.textContent = on ? "connected" : "reconnecting";
+    net.className = "netstate" + (on ? "" : " off");
+  });
+
+  /* One redraw per burst. Firebase pushes on every change and a round in play
+     changes often; redrawing on each would fight the facilitator's scroll. */
+  var pending = null;
+  function schedule(){
+    if (pending) return;
+    pending = setTimeout(function(){ pending = null; try { draw(); } catch(e){
+      FAILURE = e && e.message; draw();
+    } }, 400);
+  }
+  function fail(e){ FAILURE = (e && (e.message || e.code)) || "unknown"; draw(); }
+
+  DB.ref("teams").on("value", function(sn){ TEAMS = sn.val() || {}; schedule(); }, fail);
+  DB.ref("rounds").on("value", function(sn){ ROUNDS = sn.val() || {}; schedule(); }, fail);
+
+  draw();
+})();
+</script>
+</body>
+</html>
