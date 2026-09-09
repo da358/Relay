@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Relay mobile touch testbed 260909.1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#070B0F; --paper:#E6EDF3; --dim:#8A9AAB;
+    --panel:#0E141B; --rule:#26333F; --raise:#151D26;
+    --cyan:#4FB6C8; --red:#D6453F; --green:#4FA557;
+    --ts:1;
+  }
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --paper:#0F1519; --dim:#54626F;
+    --panel:#F4F7FA; --rule:#C7D2DC; --raise:#E4EBF1;
+    --cyan:#0B6A7A; --red:#A8221B; --green:#256E2A;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overscroll-behavior:none; }
+  body{
+    background:var(--bg); color:var(--paper);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:calc(17px * var(--ts));
+    display:flex; flex-direction:column;
+    height:100dvh; width:100%;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right)
+            env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action:manipulation;
+  }
+
+  header{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; border-bottom:1px solid var(--rule); flex:0 0 auto;
+  }
+  header h1{
+    margin:0; font-size:calc(17px * var(--ts)); font-weight:800;
+    letter-spacing:.10em; flex:1 1 auto;
+  }
+  header h1 em{ font-style:normal; font-weight:500; color:var(--dim);
+                letter-spacing:.02em; font-size:calc(13px * var(--ts)); }
+
+  .seg{ display:flex; border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .seg button{
+    appearance:none; border:0; background:transparent; color:var(--dim);
+    font:inherit; font-weight:700; font-size:calc(15px * var(--ts));
+    padding:12px 16px; min-height:48px; min-width:76px;
+  }
+  .seg button.on{ background:var(--cyan); color:var(--bg); }
+
+  button.k{
+    appearance:none; border:1px solid var(--rule); border-radius:10px;
+    background:var(--raise); color:var(--paper);
+    font:inherit; font-weight:700; font-size:calc(15px * var(--ts));
+    padding:12px 14px; min-height:48px;
+  }
+
+  #stage{
+    position:relative; flex:1 1 auto; min-height:44vh;
+    background:var(--panel); touch-action:none; overflow:hidden;
+  }
+  #stage canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #paneRow{
+    position:absolute; top:10px; left:10px; z-index:3;
+    background:var(--panel); border-radius:10px;
+  }
+  #stageInfo{
+    position:absolute; top:16px; right:12px; z-index:3;
+    color:var(--dim); font-size:calc(13px * var(--ts)); font-weight:600;
+  }
+
+  #builderBar{ flex:0 0 auto; padding:10px 12px 4px; }
+  #swatches{ display:flex; gap:10px; margin:12px 0 0; }
+  #swatches button{
+    flex:1 1 0; height:60px; border-radius:12px;
+    border:3px solid transparent; position:relative;
+    box-shadow:inset 0 -10px 0 rgba(0,0,0,.22), inset 0 10px 0 rgba(255,255,255,.14);
+    touch-action:none;
+  }
+  #swatches button.on{ border-color:var(--paper); }
+  #swatches button.off{ opacity:.32; }
+
+  #actions{ display:flex; gap:8px; margin-top:12px; }
+  #actions button{ flex:1 1 0; }
+
+  .verdict{
+    margin:12px 0 0; min-height:calc(24px * var(--ts));
+    font-weight:800; font-size:calc(17px * var(--ts)); letter-spacing:.04em;
+  }
+  .verdict.good{ color:var(--green); }
+  .verdict.bad{ color:var(--red); }
+
+  footer{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:8px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--rule);
+    color:var(--dim); font-size:calc(12px * var(--ts));
+  }
+  footer #mFoot{ flex:1 1 auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>RELAY <em>touch testbed</em></h1>
+  <button class="k" id="bView">VIEW 1</button>
+  <button class="k" id="bTheme">LIGHT</button>
+</header>
+
+<div id="stage">
+  <div class="seg" id="paneRow">
+    <button id="paneBuild" class="on">BUILD</button>
+    <button id="paneDesign">DESIGN</button>
+  </div>
+  <div id="stageInfo">design <span id="mDesign">1 of 20</span></div>
+  <canvas id="cvBuild"></canvas>
+  <canvas id="cvDesign" style="display:none"></canvas>
+</div>
+
+<div id="builderBar">
+  <div class="seg" style="width:100%">
+    <button id="tPlace" class="on" style="flex:1">ADD</button>
+    <button id="tErase" style="flex:1">REMOVE</button>
+  </div>
+  <div id="swatches">
+    <button id="sw-y"></button><button id="sw-b"></button>
+    <button id="sw-o"></button><button id="sw-p"></button>
+  </div>
+  <div id="actions">
+    <button class="k" id="bCheck">CHECK</button>
+    <button class="k" id="bClear">CLEAR</button>
+    <button class="k" id="bNext">NEXT</button>
+  </div>
+  <div class="verdict" id="mVerdict"></div>
+  <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
+    <span style="color:var(--dim); font-size:calc(13px * var(--ts))">gesture</span>
+    <button class="k" id="bGesture" style="flex:1">PRESS + SLIDE</button>
+    <span style="color:var(--dim); font-size:calc(13px * var(--ts))" id="mCount">0 cubes</span>
+  </div>
+</div>
+
+<footer>
+  <span id="mFoot"></span>
+  <span id="mWake">…</span>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  /* ==========================================================
+     1. GEOMETRY CONSTANTS            [verbatim from maker 260903.5]
+     ========================================================== */
+  var GRID = 5, MAXY = 7;
+  var DIRS  = [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]];
+  var OPP   = [1,0,3,2,5,4];
+  var HORIZ = [2,3,4,5];
+
+  function key(x,y,z){ return x+","+y+","+z; }
+  function mapOf(cubes){
+    var m = {};
+    for (var i=0;i<cubes.length;i++) m[key(cubes[i].x,cubes[i].y,cubes[i].z)] = i;
+    return m;
+  }
+  function inBounds(x,y,z){ return x>=0&&x<GRID&&z>=0&&z<GRID&&y>=0&&y<MAXY; }
+
+  /* ==========================================================
+     2. THE 24 ORIENTATIONS           [verbatim from maker 260903.5]
+     Built by closure from three quarter-turns so the table cannot
+     drift out of step with the quaternions used to draw them.
+     ========================================================== */
+  var ROT = { y:[0,1,5,4,2,3], x:[4,5,2,3,1,0], z:[3,2,0,1,4,5] };
+  var AXIS = {
+    x: new THREE.Vector3(1,0,0),
+    y: new THREE.Vector3(0,1,0),
+    z: new THREE.Vector3(0,0,1)
+  };
+  function composePerm(perm, mv){
+    var out = new Array(6);
+    for (var d=0; d<6; d++) out[mv[d]] = perm[d];
+    return out;
+  }
+  var ORI = (function(){
+    var id = [0,1,2,3,4,5];
+    var list = [{ perm:id, quat:new THREE.Quaternion() }];
+    var seen = {}; seen[id.join()] = 0;
+    var queue = [0];
+    while (queue.length){
+      var ci = queue.shift();
+      ["x","y","z"].forEach(function(ax){
+        var np = composePerm(list[ci].perm, ROT[ax]);
+        var k = np.join();
+        if (seen[k] !== undefined) return;
+        var qm = new THREE.Quaternion().setFromAxisAngle(AXIS[ax], Math.PI/2);
+        var nq = qm.clone().multiply(list[ci].quat);
+        seen[k] = list.length;
+        list.push({ perm:np, quat:nq });
+        queue.push(list.length-1);
+      });
+    }
+    return list;
+  })();
+  var ORIKEY = (function(){
+    var m = {};
+    for (var i=0;i<ORI.length;i++) m[ORI[i].perm.join()] = i;
+    return m;
+  })();
+  function turn(o, ax){ return ORIKEY[composePerm(ORI[o].perm, ROT[ax]).join()]; }
+  function turnBack(o, ax){ return turn(turn(turn(o, ax), ax), ax); }
+  function faceAt(o, d){ return ORI[o].perm[d]; }
+  function tipOnto(o, d){
+    if (d === 2) return turnBack(o, "z");
+    if (d === 3) return turn(o, "z");
+    if (d === 4) return turn(o, "x");
+    if (d === 5) return turnBack(o, "x");
+    return o;
+  }
+
+  /* ==========================================================
+     3. SUPPORT AND DELETION          [verbatim from maker 260903.5]
+     ========================================================== */
+  function groundedSet(cubes){
+    var m = mapOf(cubes), ok = {}, queue = [], i;
+    for (i=0;i<cubes.length;i++) if (cubes[i].y === 0){ ok[i]=1; queue.push(i); }
+    while (queue.length){
+      var c = cubes[queue.pop()];
+      for (var d=0; d<6; d++){
+        var j = m[key(c.x+DIRS[d][0], c.y+DIRS[d][1], c.z+DIRS[d][2])];
+        if (j !== undefined && !ok[j]){ ok[j]=1; queue.push(j); }
+      }
+    }
+    return ok;
+  }
+  function stackedSet(cubes){
+    var m = mapOf(cubes), ok = {}, changed = true;
+    while (changed){
+      changed = false;
+      for (var i=0;i<cubes.length;i++){
+        if (ok[i]) continue;
+        var c = cubes[i];
+        if (c.y === 0){ ok[i]=1; changed=true; continue; }
+        var b = m[key(c.x, c.y-1, c.z)];
+        if (b !== undefined && ok[b]){ ok[i]=1; changed=true; }
+      }
+    }
+    return ok;
+  }
+  function supportSet(cubes, rule){
+    return rule === "stacked" ? stackedSet(cubes) : groundedSet(cubes);
+  }
+  function doomed(cubes, rule, target){
+    if (rule === "peel"){
+      var r0 = cubes.filter(function(_,i){ return i !== target; });
+      var s0 = supportSet(r0, "grounded");
+      for (var i=0;i<r0.length;i++) if (!s0[i]) return null;
+      return [target];
+    }
+    var keepIx = [], rest = [];
+    for (var j=0;j<cubes.length;j++){
+      if (j === target) continue;
+      keepIx.push(j); rest.push(cubes[j]);
+    }
+    var ok = supportSet(rest, rule), out = [target];
+    for (var k=0;k<rest.length;k++) if (!ok[k]) out.push(keepIx[k]);
+    return out;
+  }
+  function canPlace(cubes, rule, x, y, z){
+    if (!inBounds(x,y,z)) return false;
+    var m = mapOf(cubes);
+    if (m[key(x,y,z)] !== undefined) return false;
+    if (y === 0) return true;
+    if (rule === "stacked") return m[key(x,y-1,z)] !== undefined;
+    for (var d=0; d<6; d++)
+      if (m[key(x+DIRS[d][0], y+DIRS[d][1], z+DIRS[d][2])] !== undefined) return true;
+    return false;
+  }
+  function exposedFaces(cubes, i, mode){
+    var m = mapOf(cubes), c = cubes[i], out = [];
+    var cand = mode === "top" ? [0] : [0,2,3,4,5];
+    for (var k=0;k<cand.length;k++){
+      var d = cand[k];
+      if (m[key(c.x+DIRS[d][0], c.y+DIRS[d][1], c.z+DIRS[d][2])] === undefined) out.push(d);
+    }
+    return out;
+  }
+
+  /* ==========================================================
+     4. PALETTE                       [verbatim from maker 260903.5]
+     Okabe-Ito members, chosen so no two are confusable by eye under
+     colour-vision deficiency AND no two are confusable by ear.
+     ========================================================== */
+  var COLOURS = [
+    { key:"y", name:"Yellow", hex:"#F0E442" },
+    { key:"b", name:"Blue",   hex:"#56B4E9" },
+    { key:"o", name:"Orange", hex:"#D55E00" },
+    { key:"p", name:"Pink",   hex:"#CC79A7" },
+    { key:"F", name:"Seed block", hex:"#9AA3AE" }
+  ];
+  var CKEYS = ["y","b","o","p"];
+  function colInfo(k){
+    for (var i=0;i<COLOURS.length;i++) if (COLOURS[i].key === k) return COLOURS[i];
+    return COLOURS[0];
+  }
+  var FACEMAP = {
+    y:[0,1,2,12,13,14],
+    b:[3,4,5,12,15,16],
+    o:[6,7,8,13,15,17],
+    p:[9,10,11,14,16,17],
+    F:[0,3,6,9,12,15]
+  };
+
+  /* ==========================================================
+     5. GLYPHS                        [verbatim from maker 260903.5]
+     Drawn procedurally: familiar parts, unfamiliar wholes.
+     ========================================================== */
+  var GS = 128, INK = "#141A21";
+  function gctx(){
+    var c = document.createElement("canvas");
+    c.width = GS; c.height = GS;
+    return c;
+  }
+  function P(ctx){
+    var s = GS, mid = s/2;
+    return {
+      ring: function(r,w){ ctx.lineWidth = (w||0.07)*s; ctx.beginPath();
+        ctx.arc(mid,mid,r*s,0,Math.PI*2); ctx.stroke(); },
+      disc: function(r){ ctx.beginPath(); ctx.arc(mid,mid,r*s,0,Math.PI*2); ctx.fill(); },
+      dot: function(x,y,r){ ctx.beginPath(); ctx.arc(x*s,y*s,r*s,0,Math.PI*2); ctx.fill(); },
+      bar: function(x,y,w,h){ ctx.fillRect((x-w/2)*s,(y-h/2)*s,w*s,h*s); },
+      line: function(x1,y1,x2,y2,w){ ctx.lineWidth=(w||0.07)*s; ctx.beginPath();
+        ctx.moveTo(x1*s,y1*s); ctx.lineTo(x2*s,y2*s); ctx.stroke(); },
+      poly: function(pts, fill){ ctx.beginPath();
+        for (var i=0;i<pts.length;i++){
+          if (i===0) ctx.moveTo(pts[i][0]*s, pts[i][1]*s);
+          else ctx.lineTo(pts[i][0]*s, pts[i][1]*s);
+        }
+        ctx.closePath(); if (fill) ctx.fill(); else { ctx.lineWidth=0.07*s; ctx.stroke(); } },
+      arc: function(cx,cy,r,a0,a1,w){ ctx.lineWidth=(w||0.08)*s; ctx.beginPath();
+        ctx.arc(cx*s,cy*s,r*s,a0,a1); ctx.stroke(); }
+    };
+  }
+  var SYM = [
+    function(p){ p.ring(0.30); },
+    function(p){ p.disc(0.22); },
+    function(p){ p.bar(0.5,0.5,0.62,0.11); p.bar(0.5,0.5,0.11,0.62); },
+    function(p){ p.line(0.24,0.24,0.76,0.76); p.line(0.76,0.24,0.24,0.76); },
+    function(p){ p.poly([[0.26,0.26],[0.74,0.26],[0.74,0.74],[0.26,0.74]]); },
+    function(p){ p.poly([[0.5,0.2],[0.8,0.5],[0.5,0.8],[0.2,0.5]]); },
+    function(p){ p.dot(0.5,0.22,0.075); p.dot(0.5,0.78,0.075);
+                 p.dot(0.22,0.5,0.075); p.dot(0.78,0.5,0.075); },
+    function(p){ p.dot(0.27,0.27,0.075); p.dot(0.73,0.27,0.075);
+                 p.dot(0.27,0.73,0.075); p.dot(0.73,0.73,0.075); },
+    function(p){ p.ring(0.36,0.055); p.ring(0.18,0.055); },
+    function(p){ p.ring(0.32,0.06); p.disc(0.10); },
+    function(p){ p.poly([[0.26,0.26],[0.74,0.26],[0.74,0.74],[0.26,0.74]]); p.disc(0.10); },
+    function(p){ p.poly([[0.5,0.18],[0.82,0.5],[0.5,0.82],[0.18,0.5]]); p.disc(0.09); },
+    function(p){ p.ring(0.34,0.055); p.bar(0.5,0.5,0.44,0.10); p.bar(0.5,0.5,0.10,0.44); },
+    function(p){ p.ring(0.34,0.055); p.line(0.30,0.30,0.70,0.70,0.075);
+                 p.line(0.70,0.30,0.30,0.70,0.075); },
+    function(p){ p.poly([[0.22,0.22],[0.78,0.22],[0.78,0.78],[0.22,0.78]]);
+                 p.poly([[0.5,0.32],[0.68,0.5],[0.5,0.68],[0.32,0.5]], true); },
+    function(p){ p.ring(0.24,0.06); p.dot(0.5,0.13,0.065); p.dot(0.5,0.87,0.065);
+                 p.dot(0.13,0.5,0.065); p.dot(0.87,0.5,0.065); },
+    function(p){ var a=Math.PI/2;
+                 for (var i=0;i<4;i++) p.arc(0.5,0.5,0.30,i*a+0.15,i*a+a-0.35,0.085); },
+    function(p){ p.bar(0.5,0.5,0.56,0.10); p.bar(0.5,0.5,0.10,0.56);
+                 p.dot(0.26,0.26,0.06); p.dot(0.74,0.26,0.06);
+                 p.dot(0.26,0.74,0.06); p.dot(0.74,0.74,0.06); }
+  ];
+  var ASYM = [
+    function(p){ p.arc(0.5,0.58,0.30,Math.PI,Math.PI*2,0.10); p.dot(0.5,0.30,0.075); },
+    function(p){ p.poly([[0.22,0.66],[0.5,0.28],[0.78,0.66]]); p.dot(0.5,0.76,0.065); },
+    function(p){ p.poly([[0.24,0.24],[0.62,0.24],[0.62,0.50],[0.24,0.50]], true);
+                 p.ring(0.16,0.06); },
+    function(p){ p.bar(0.44,0.36,0.52,0.11); p.bar(0.58,0.62,0.52,0.11); },
+    function(p){ p.arc(0.44,0.5,0.26,-0.9,2.1,0.10); p.line(0.60,0.30,0.82,0.22,0.08); },
+    function(p){ p.poly([[0.22,0.52],[0.78,0.52],[0.78,0.30],[0.22,0.30]], true);
+                 p.arc(0.5,0.56,0.24,0,Math.PI,0.09); },
+    function(p){ p.poly([[0.5,0.5],[0.84,0.30],[0.84,0.70]], true); p.dot(0.26,0.5,0.085); },
+    function(p){ p.line(0.24,0.72,0.42,0.72,0.09); p.line(0.42,0.72,0.42,0.48,0.09);
+                 p.line(0.42,0.48,0.62,0.48,0.09); p.line(0.62,0.48,0.62,0.26,0.09); },
+    function(p){ p.ring(0.28,0.06); p.dot(0.76,0.24,0.085); },
+    function(p){ p.poly([[0.26,0.26],[0.74,0.26],[0.50,0.76]], true); },
+    function(p){ p.arc(0.5,0.5,0.32,-1.2,1.2,0.10); p.bar(0.34,0.5,0.24,0.10); },
+    function(p){ p.dot(0.30,0.30,0.09); p.dot(0.30,0.56,0.065); p.dot(0.56,0.30,0.065);
+                 p.line(0.44,0.70,0.78,0.70,0.08); },
+    function(p){ p.poly([[0.22,0.30],[0.78,0.30],[0.78,0.44],[0.36,0.44],[0.36,0.74],[0.22,0.74]], true); },
+    function(p){ p.arc(0.38,0.42,0.22,0,Math.PI*2,0.07); p.arc(0.68,0.66,0.14,0,Math.PI*2,0.07); },
+    function(p){ p.bar(0.5,0.28,0.60,0.10); p.poly([[0.5,0.42],[0.72,0.76],[0.28,0.76]], true); },
+    function(p){ p.line(0.24,0.24,0.76,0.42,0.09); p.line(0.24,0.52,0.60,0.66,0.09);
+                 p.dot(0.30,0.78,0.07); },
+    function(p){ p.poly([[0.5,0.20],[0.80,0.50],[0.5,0.80],[0.20,0.50]]);
+                 p.poly([[0.5,0.34],[0.66,0.50],[0.5,0.66]], true);
+                 p.dot(0.5,0.86,0.065); },
+    function(p){ p.arc(0.58,0.50,0.28,0.6,4.2,0.10); p.dot(0.30,0.28,0.075);
+                 p.bar(0.72,0.76,0.22,0.09); }
+  ];
+
+  var GLYPH = { sym:[], asym:[] };
+  (function bakeGlyphs(){
+    [["sym",SYM],["asym",ASYM]].forEach(function(pair){
+      var famk = pair[0], defs = pair[1];
+      for (var i=0;i<defs.length;i++){
+        var cv = gctx(), ctx = cv.getContext("2d");
+        ctx.clearRect(0,0,GS,GS);
+        ctx.strokeStyle = INK; ctx.fillStyle = INK;
+        ctx.lineJoin = "round"; ctx.lineCap = "round";
+        try { defs[i](P(ctx)); } catch(e){ /* keep going if one mark misbehaves */ }
+        GLYPH[famk].push(cv);
+      }
+    });
+  })();
+
+  /* one texture per colour + die-face + mark family, with a dim variant so a
+     mark that does not count can be shown without being shouted */
+  function greyOf(hex){
+    var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16),
+        b = parseInt(hex.slice(5,7),16);
+    var l = Math.round(0.299*r + 0.587*g + 0.114*b);
+    l = Math.round(l*0.42 + 96);
+    return "rgb("+l+","+l+","+l+")";
+  }
+  var TEX = {};
+  function texFor(colourKey, faceIx, famk, dim, style){
+    var k = colourKey+":"+faceIx+":"+famk+(dim?":d":"")+(style?":"+style:"");
+    if (TEX[k]) return TEX[k];
+    var cv = gctx(), ctx = cv.getContext("2d");
+    ctx.fillStyle = style === "mute" ? greyOf(colInfo(colourKey).hex) : colInfo(colourKey).hex;
+    ctx.fillRect(0,0,GS,GS);
+    if (famk !== "none"){
+      var design = FACEMAP[colourKey][faceIx];
+      if (dim || style === "mute") ctx.globalAlpha = style === "mute" ? 0.22 : 0.16;
+      ctx.drawImage(GLYPH[famk][design], 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    if (style === "zebra"){
+      ctx.save();
+      ctx.globalAlpha = 0.62;
+      ctx.fillStyle = "#0B1017";
+      ctx.translate(GS/2, GS/2); ctx.rotate(-Math.PI/4); ctx.translate(-GS, -GS);
+      for (var sx=0; sx<GS*2; sx+=GS/4.5) ctx.fillRect(sx, 0, GS/9, GS*2);
+      ctx.restore();
+    }
+    var t = new THREE.CanvasTexture(cv);
+    t.anisotropy = 4;
+    TEX[k] = t;
+    return t;
+  }
+  var MATS = {};
+  // BoxGeometry material slots run +x -x +y -y +z -z
+  var SLOTFACE = [2,3,0,1,4,5];
+  function matsFor(colourKey, famk, brightMask, style){
+    var mk = brightMask ? brightMask.map(function(b){ return b?1:0; }).join("") : "111111";
+    var k = colourKey+":"+famk+":"+mk+(style?":"+style:"");
+    if (MATS[k]) return MATS[k];
+    var arr = [];
+    for (var m=0;m<6;m++){
+      var f = SLOTFACE[m];
+      var dim = brightMask ? !brightMask[f] : false;
+      arr.push(new THREE.MeshLambertMaterial({ map: texFor(colourKey, f, famk, dim, style) }));
+    }
+    MATS[k] = arr;
+    return arr;
+  }
+
+  /* ==========================================================
+     6. VARIANT TRANSFORMS            [verbatim from maker 260903.5]
+     Not used at deal time in this build — the library is dealt one
+     hand-made member per family — but carried so the deferred
+     deal-time variance in brief 3.2 has a tested implementation.
+     ========================================================== */
+  function cloneList(list){
+    return list.map(function(q){
+      return { x:q.x, y:q.y, z:q.z, c:q.c, o:q.o, fixed:q.fixed };
+    });
+  }
+  function recentre(list){
+    if (!list.length) return list;
+    var mnx=Infinity,mxx=-Infinity,mnz=Infinity,mxz=-Infinity,mny=Infinity;
+    list.forEach(function(q){
+      if (q.x<mnx) mnx=q.x; if (q.x>mxx) mxx=q.x;
+      if (q.z<mnz) mnz=q.z; if (q.z>mxz) mxz=q.z;
+      if (q.y<mny) mny=q.y;
+    });
+    var ox = Math.floor((GRID-(mxx-mnx+1))/2) - mnx;
+    var oz = Math.floor((GRID-(mnz===mxz?1:(mxz-mnz+1)))/2) - mnz;
+    return list.map(function(q){
+      return { x:q.x+ox, y:q.y-mny, z:q.z+oz, c:q.c, o:q.o, fixed:q.fixed };
+    });
+  }
+  function vTurn(list){
+    return recentre(list.map(function(q){
+      return { x:-q.z, y:q.y, z:q.x, c:q.c, o:turn(q.o,"y"), fixed:q.fixed };
+    }));
+  }
+  function vMirror(list){
+    return recentre(list.map(function(q){
+      return { x:-q.x, y:q.y, z:q.z, c:q.c, o:q.o, fixed:q.fixed };
+    }));
+  }
+  function vRemap(list, map){
+    return list.map(function(q){
+      return { x:q.x, y:q.y, z:q.z, c: q.fixed ? q.c : (map[q.c] || q.c),
+               o:q.o, fixed:q.fixed };
+    });
+  }
+  function vShuffleColours(list, rnd){
+    rnd = rnd || Math.random;
+    var pool = CKEYS.slice();
+    for (var i=pool.length-1;i>0;i--){
+      var j = Math.floor(rnd()*(i+1)), t = pool[i]; pool[i]=pool[j]; pool[j]=t;
+    }
+    var map = {};
+    for (var k=0;k<CKEYS.length;k++) map[CKEYS[k]] = pool[k];
+    return vRemap(list, map);
+  }
+  function vRerollMarks(list, rnd){
+    rnd = rnd || Math.random;
+    return list.map(function(q){
+      return { x:q.x, y:q.y, z:q.z, c:q.c, o:Math.floor(rnd()*24), fixed:q.fixed };
+    });
+  }
+
+  /* ==========================================================
+     7. DESIGN FORMAT READER          [adapted from maker 260903.5]
+     The library is baked in below as literals, so only the array
+     form is read; the checks are the maker's.
+     ========================================================== */
+  function toCubes(freeArr, fixedArr){
+    var out = [], i, q;
+    if (freeArr) for (i=0;i<freeArr.length;i++){
+      q = freeArr[i];
+      var x=Array.isArray(q)?q[0]:q.x, y=Array.isArray(q)?q[1]:q.y,
+          z=Array.isArray(q)?q[2]:q.z, c=Array.isArray(q)?q[3]:q.c,
+          o=Array.isArray(q)?q[4]:q.o;
+      if (typeof x!=="number"||typeof y!=="number"||typeof z!=="number") return null;
+      if (!inBounds(x,y,z)) return null;
+      out.push({ x:x, y:y, z:z, c: CKEYS.indexOf(c)>=0?c:"y",
+                 o: (typeof o==="number" && o>=0 && o<24)?o:0, fixed:false });
+    }
+    if (fixedArr) for (i=0;i<fixedArr.length;i++){
+      q = fixedArr[i];
+      var fx=Array.isArray(q)?q[0]:q.x, fy=Array.isArray(q)?q[1]:q.y,
+          fz=Array.isArray(q)?q[2]:q.z, fo=Array.isArray(q)?q[3]:q.o;
+      if (typeof fx!=="number"||typeof fy!=="number"||typeof fz!=="number") return null;
+      if (!inBounds(fx,fy,fz)) return null;
+      out.push({ x:fx, y:fy, z:fz, c:"F",
+                 o:(typeof fo==="number" && fo>=0 && fo<24)?fo:0, fixed:true });
+    }
+    return out.length ? out : null;
+  }
+
+  /* ==========================================================
+     MOBILE OVERRIDE — the only edit to the copied logic above.
+     A phone gets a 4x4 plate four cubes high: bigger tap targets,
+     and designs that stay legible in portrait. Section 13 below
+     derives its camera distance from GRID, so this comes first.
+     ========================================================== */
+  GRID = 4; MAXY = 4;
+
+  /* ==========================================================
+     MOBILE DESIGN SET (provisional)
+     The four families from library-260906 that are already
+     column-only, translated into the 4x4 plate. 20 designs, no
+     face marks. Replaced once the real mobile set is authored.
+     ========================================================== */
+  var MDESIGNS = [
+    { id:"d-cimve9", family:"d-cimve9", name:"lowboy", tier:"2E",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,0,"y",0],[1,0,2,"b",0],[1,0,1,"y",0],[1,0,0,"y",0],[1,1,1,"b",0]] },
+    { id:"d-y39dgp", family:"d-cimve9", name:"lowboy v2", tier:"2E",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"y",0],[0,0,1,"o",0],[1,0,1,"y",0],[2,0,1,"y",0],[1,1,1,"o",0]] },
+    { id:"d-amvn08", family:"d-cimve9", name:"lowboy v3", tier:"2E",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,0,"o",0],[1,0,2,"y",0],[1,0,1,"o",0],[1,0,0,"o",0],[1,1,1,"y",0]] },
+    { id:"d-ukjken", family:"d-cimve9", name:"lowboy v4", tier:"2E",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[0,0,2,"o",0],[2,0,1,"b",0],[1,0,1,"o",0],[0,0,1,"o",0],[1,1,1,"b",0]] },
+    { id:"d-xwyto1", family:"d-cimve9", name:"lowboy v5", tier:"2E",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,1,"y",0],[0,0,2,"b",0],[1,0,2,"y",0],[2,0,2,"y",0],[1,1,2,"b",0]] },
+    { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[0,0,1,"p",0],[1,0,1,"b",0],[2,0,1,"p",0],[2,0,2,"p",0],[0,1,1,"b",0]] },
+    { id:"d-f5fg4s", family:"d-coxziw", name:"welcome v2", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"b",0],[2,0,1,"y",0],[2,0,0,"b",0],[1,0,0,"b",0],[2,1,2,"y",0]] },
+    { id:"d-7yje46", family:"d-coxziw", name:"welcome v3", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,1,"p",0],[1,0,1,"y",0],[0,0,1,"p",0],[0,0,2,"p",0],[2,1,1,"y",0]] },
+    { id:"d-m788w1", family:"d-coxziw", name:"welcome v4", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,0,"p",0],[2,0,1,"y",0],[2,0,2,"p",0],[1,0,2,"p",0],[2,1,0,"y",0]] },
+    { id:"d-su6uto", family:"d-coxziw", name:"welcome v5", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[0,0,2,"b",0],[1,0,2,"o",0],[2,0,2,"b",0],[2,0,1,"b",0],[0,1,2,"o",0]] },
+    { id:"d-9uifid", family:"d-9uifid", name:"jetty", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[1,0,2,"p",0],[2,0,2,"p",0],[0,1,1,"p",0]] },
+    { id:"d-r8k08j", family:"d-9uifid", name:"jetty v2", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[1,0,1,"p",0],[1,0,2,"p",0],[2,1,0,"p",0]] },
+    { id:"d-3chiv8", family:"d-9uifid", name:"jetty v3", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"o",0],[1,0,2,"o",0],[1,0,1,"b",0],[0,0,1,"b",0],[2,1,2,"b",0]] },
+    { id:"d-1a0eb8", family:"d-9uifid", name:"jetty v4", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,1,"p",0],[1,0,1,"p",0],[1,0,2,"o",0],[0,0,2,"o",0],[2,1,1,"o",0]] },
+    { id:"d-c1yf6d", family:"d-9uifid", name:"jetty v5", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"b",0],[2,0,1,"b",0],[1,0,1,"p",0],[1,0,0,"p",0],[2,1,2,"p",0]] },
+    { id:"d-eh011t", family:"d-eh011t", name:"ledge", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[2,0,1,"b",0],[2,0,2,"y",0],[1,1,1,"y",0],[2,1,1,"y",0]] },
+    { id:"d-6rgqsr", family:"d-eh011t", name:"ledge v2", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[2,0,2,"y",0],[1,0,2,"o",0],[2,1,1,"o",0],[2,1,2,"o",0]] },
+    { id:"d-83ptoe", family:"d-eh011t", name:"ledge v3", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"y",0],[1,0,2,"y",0],[0,0,2,"y",0],[0,0,1,"p",0],[1,1,2,"p",0],[0,1,2,"p",0]] },
+    { id:"d-3rwav2", family:"d-eh011t", name:"ledge v4", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,1,"o",0],[1,0,1,"o",0],[0,0,1,"o",0],[0,0,2,"p",0],[1,1,1,"p",0],[0,1,1,"p",0]] },
+    { id:"d-2x3u62", family:"d-eh011t", name:"ledge v5", tier:"1",
+      glyphs:"none", faces:"top", rule:"stacked",
+      cubes:[[2,0,2,"y",0],[2,0,1,"y",0],[2,0,0,"y",0],[1,0,0,"b",0],[2,1,1,"b",0],[2,1,0,"b",0]] }
+  ];
+  /* ==========================================================
+     11. COMPARISON AND VERDICTS
+     Six verdicts in strict precedence so exactly one shows, plus
+     NOT SUBMITTED, which is a state and not a verdict. Brief 5.1.
+     ========================================================== */
+  function scoringDirs(cs, i, faceMode){ return exposedFaces(cs, i, faceMode); }
+  function markOn(q, d){ return FACEMAP[q.fixed?"F":q.c][faceAt(q.o, d)]; }
+
+  function shifted(cs){
+    if (!cs.length) return [];
+    var mx=Infinity,my=Infinity,mz=Infinity;
+    cs.forEach(function(q){ if(q.x<mx)mx=q.x; if(q.y<my)my=q.y; if(q.z<mz)mz=q.z; });
+    return cs.map(function(q){
+      return { x:q.x-mx, y:q.y-my, z:q.z-mz, c:q.c, o:q.o, fixed:q.fixed };
+    });
+  }
+  function spin(cs){
+    return cs.map(function(q){
+      return { x:-q.z, y:q.y, z:q.x, c:q.c, o:turn(q.o,"y"), fixed:q.fixed };
+    });
+  }
+  function flip(cs){
+    return cs.map(function(q){
+      return { x:-q.x, y:q.y, z:q.z, c:q.c, o:q.o, fixed:q.fixed };
+    });
+  }
+  function sigShape(cs){
+    return shifted(cs).map(function(q){ return q.x+","+q.y+","+q.z; }).sort().join("|");
+  }
+  function sigColour(cs){
+    return shifted(cs).map(function(q){
+      return q.x+","+q.y+","+q.z+","+(q.fixed?"F":q.c); }).sort().join("|");
+  }
+  function sigFacing(cs, glyphs, faceMode){
+    if (glyphs === "none") return sigColour(cs);
+    var sh = shifted(cs);
+    return sh.map(function(q,i){
+      var ds = scoringDirs(cs, i, faceMode);
+      var marks = ds.map(function(d){ return d+":"+markOn(cs[i], d); }).join("/");
+      return q.x+","+q.y+","+q.z+","+(q.fixed?"F":q.c)+","+marks;
+    }).sort().join("|");
+  }
+
+  var VERDICTS = ["WRONG SHAPE","MIRRORED","TURNED","COLORS","FACING","PERFECT"];
+  function verdictOf(design, build){
+    if (!build || !build.length) return "NOT SUBMITTED";
+    var d = design.cubes, glyphs = design.glyphs, faceMode = design.faces;
+    var dShape = sigShape(d);
+    var rot = build, mir = flip(build), i;
+    var idShape = sigShape(build) === dShape, rotShape = idShape, mirShape = false;
+    for (i=0;i<4;i++){
+      if (sigShape(rot) === dShape) rotShape = true;
+      if (sigShape(mir) === dShape) mirShape = true;
+      rot = spin(rot); mir = spin(mir);
+    }
+    if (!rotShape && !mirShape) return "WRONG SHAPE";
+    if (!rotShape && mirShape)  return "MIRRORED";
+    if (!idShape)               return "TURNED";
+    if (sigColour(build) !== sigColour(d)) return "COLORS";
+    if (sigFacing(build, glyphs, faceMode) !== sigFacing(d, glyphs, faceMode)) return "FACING";
+    return "PERFECT";
+  }
+  function verdictClass(v){
+    if (v === "PERFECT") return "perfect";
+    if (v === "COLORS" || v === "FACING") return "near";
+    if (v === "NOT SUBMITTED") return "";
+    return "bad";
+  }
+  var VERDICT_WHY = {
+    "WRONG SHAPE":"The shape does not match, turned or mirrored.",
+    "MIRRORED":"Right shape, but built as a mirror image \u2014 the your-left/my-left error.",
+    "TURNED":"Right shape, facing the wrong way round.",
+    "COLORS":"Shape right, one or more cubes the wrong color.",
+    "FACING":"Shape and colors right, one or more marks facing the wrong way.",
+    "PERFECT":"Everything matches.",
+    "NOT SUBMITTED":"Never submitted, so it was not compared."
+  };
+
+  /* ---- visual diff, compared where the two builds actually sit ----
+     Extras outlined red, missing cubes as translucent ghosts, wrong
+     colors and wrong facings flagged on the cube itself and counted
+     in words, because a verdict alone will not tell a pair which cube. */
+  function diffOf(design, build){
+    var d = design.cubes, b = build || [];
+    var dm = {}, bm = {}, i, k;
+    d.forEach(function(q,ix){ dm[key(q.x,q.y,q.z)] = ix; });
+    b.forEach(function(q,ix){ bm[key(q.x,q.y,q.z)] = ix; });
+    var out = { design:{}, build:{}, extra:0, missing:0, color:0, facing:0,
+                ghosts:[], marksMatter: design.glyphs !== "none" };
+    for (k in bm){
+      i = bm[k];
+      if (dm[k] === undefined){ out.build[i] = "extra"; out.extra++; continue; }
+      var j = dm[k], qb = b[i], qd = d[j];
+      if (qb.c !== qd.c){ out.build[i] = "color"; out.design[j] = "color"; out.color++; continue; }
+      if (out.marksMatter){
+        var db = scoringDirs(b, i, design.faces).map(function(dd){ return dd+":"+markOn(qb,dd); }).join("/");
+        var dd2 = scoringDirs(d, j, design.faces).map(function(dd){ return dd+":"+markOn(qd,dd); }).join("/");
+        if (db !== dd2){ out.build[i] = "facing"; out.design[j] = "facing"; out.facing++; }
+      }
+    }
+    for (k in dm){
+      if (bm[k] === undefined){
+        out.missing++;
+        out.ghosts.push(d[dm[k]]);
+      }
+    }
+    return out;
+  }
+  function diffWords(df){
+    var bits = [];
+    if (df.extra)   bits.push(df.extra+" extra");
+    if (df.missing) bits.push(df.missing+" missing");
+    if (df.color)   bits.push(df.color+" wrong color");
+    if (df.facing)  bits.push(df.facing+" facing wrong");
+    return bits.length ? bits.join(" \u00b7 ") : "Nothing out of place.";
+  }
+  /* ==========================================================
+     M0. THE COLUMN MODEL
+     The whole placement rule for the phone, and the reason the
+     mobile designs may have no overhangs. A gesture names a
+     COLUMN, never a cell in space. A cube lands on top of that
+     column; only the top cube of a column can be taken off. There
+     is no depth for a finger to get wrong.
+
+     Pure, and above anything that touches the DOM, so it runs in
+     node against the shipped file the way sections 1-11 do.
+     ========================================================== */
+
+  /* the highest cube in a column, and where it sits in the list */
+  function topOf(build, col){
+    var top = -1, ti = -1;
+    for (var i = 0; i < build.length; i++){
+      var q = build[i];
+      if (q.x === col.x && q.z === col.z && q.y > top){ top = q.y; ti = i; }
+    }
+    return { y:top, i:ti };
+  }
+
+  /* what a gesture over this column would do, or null for nothing */
+  function targetFor(build, tool, col){
+    if (!col) return null;
+    var t = topOf(build, col);
+    if (tool === "erase")
+      return t.i < 0 ? null : { kind:"cube", i:t.i, x:col.x, z:col.z };
+    var y = t.y + 1;
+    /* stacked, not grounded: the rule and the gesture have to agree, or the
+       preview will offer a placement the model then refuses */
+    if (!canPlace(build, "stacked", col.x, y, col.z)) return null;
+    return { kind:"cell", x:col.x, y:y, z:col.z };
+  }
+
+  /* carrying it out. Returns a new list; the caller never mutates in place */
+  function applyTarget(build, t, colour){
+    if (!t) return build;
+    var out = build.slice();
+    if (t.kind === "cube") out.splice(t.i, 1);
+    else out.push({ x:t.x, y:t.y, z:t.z, c:colour, fixed:false, o:0 });
+    return out;
+  }
+
+  /* a build is column-only if every cube has one directly beneath it. The
+     gesture cannot produce anything else; this is here so a design loaded
+     from a file that is not column-only fails loudly rather than becoming
+     unbuildable on a phone. Brief §11: assert the invariant where it is
+     created. */
+  function columnOnly(cubes){
+    var m = mapOf(cubes);
+    for (var i = 0; i < cubes.length; i++){
+      var c = cubes[i];
+      if (c.y !== 0 && m[key(c.x, c.y - 1, c.z)] === undefined) return false;
+    }
+    return true;
+  }
+  /* ==========================================================
+     13. SCENE PIECES                 [adapted from maker 260903.5]
+     The maker had one scene; this has several, so the scene is a
+     factory rather than a set of module-level singletons.
+     ========================================================== */
+  var GLIDE_LONG = 800, GLIDE_LEG = 550;
+  var CENTRE = new THREE.Vector3(GRID/2, 1.2, GRID/2);
+  var VDIR = [[1,1],[-1,1],[-1,-1],[1,-1]];
+  var ORBIT = GRID*1.62, LIFT = GRID*1.74;
+  function viewPos(i){
+    return new THREE.Vector3(CENTRE.x+VDIR[i][0]*ORBIT, LIFT, CENTRE.z+VDIR[i][1]*ORBIT);
+  }
+  var reduceMotion = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function ease(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+
+  var boxGeo  = new THREE.BoxGeometry(1,1,1);
+  var edgeGeo = new THREE.EdgesGeometry(boxGeo);
+  var FLAGCOL = { extra:0xD6453F, color:0xE8A33D, facing:0x9B8CE0 };
+  var TICKERS = [];
+
+  // brightMask: which of the cube's six die-faces keep a full-strength mark
+  function brightFor(cubes, i, faceMode, dim){
+    if (!dim) return null;
+    var mask = [false,false,false,false,false,false];
+    var ds = exposedFaces(cubes, i, faceMode);
+    for (var k=0;k<ds.length;k++) mask[faceAt(cubes[i].o, ds[k])] = true;
+    return mask;
+  }
+  function makeCube(q, famk, opts){
+    opts = opts || {};
+    var g = new THREE.Group();
+    var body = new THREE.Mesh(boxGeo, matsFor(q.fixed ? "F" : q.c, famk, opts.bright || null, opts.style || null));
+    body.quaternion.copy(ORI[q.o].quat);
+    if (opts.faint){
+      body.material = body.material.map(function(m){
+        var c2 = m.clone(); c2.transparent = true; c2.opacity = opts.faint; return c2;
+      });
+    }
+    g.add(body);
+    var ec = opts.flag ? FLAGCOL[opts.flag] : (opts.sel ? 0x4FB6C8 : 0x0B1017);
+    g.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({
+      color: ec, transparent:true,
+      opacity: (opts.flag || opts.sel) ? 1 : 0.6 })));
+    if (opts.flag){
+      /* WebGL will not draw a line thicker than one pixel, so weight is built
+         from nested outlines a whisker apart */
+      var w = Math.max(1, opts.weight || 2);
+      for (var k=0;k<w;k++){
+        var halo = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({
+          color:FLAGCOL[opts.flag], transparent:true, opacity:.92 }));
+        halo.scale.setScalar(1 + 0.019*(k+1));
+        g.add(halo);
+      }
+      if (opts.tint){
+        var skin = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({
+          color:FLAGCOL[opts.flag], transparent:true, opacity:0.22, depthWrite:false }));
+        skin.scale.setScalar(1.03);
+        g.add(skin);
+      }
+    }
+    g.position.set(q.x+0.5, q.y+0.5, q.z+0.5);
+    g.userData.cube = q;
+    g.userData.body = body;
+    return g;
+  }
+  function furnish(scene, plate){
+    scene.add(new THREE.AmbientLight(0xFFFFFF, 0.78));
+    var k1 = new THREE.DirectionalLight(0xFFFFFF, 0.52);
+    k1.position.set(GRID*1.2, GRID*2.2, GRID*0.8); scene.add(k1);
+    var k2 = new THREE.DirectionalLight(0xBFD6EA, 0.24);
+    k2.position.set(-GRID, GRID, -GRID); scene.add(k2);
+    if (!plate) return;
+    /* MOBILE: the two plate materials are recorded so the palette toggle can
+       recolour them without rebuilding the scene */
+    var lineMat = new THREE.MeshBasicMaterial({ color:PLATE.line });
+    var edgeMat = new THREE.MeshBasicMaterial({ color:PLATE.edge });
+    PLATEMATS.push({ line:lineMat, edge:edgeMat });
+    for (var i=0;i<=GRID;i++){
+      var thick = (i===0 || i===GRID) ? 0.075 : 0.042;
+      var mm = (i===0 || i===GRID) ? edgeMat : lineMat;
+      var a = new THREE.Mesh(new THREE.PlaneGeometry(GRID, thick), mm);
+      a.rotation.x = -Math.PI/2; a.position.set(GRID/2, 0.004, i); scene.add(a);
+      var b = new THREE.Mesh(new THREE.PlaneGeometry(thick, GRID), mm);
+      b.rotation.x = -Math.PI/2; b.position.set(i, 0.004, GRID/2); scene.add(b);
+    }
+  }
+
+  /* ---- one viewer: canvas, scene, camera on the four presets ---- */
+  var VIEWERS = [];
+  function makeViewer(canvas, opts){
+    opts = opts || {};
+    var ren = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, alpha:true });
+    ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    var scene = new THREE.Scene(); furnish(scene, opts.plate !== false);
+    var cam = new THREE.PerspectiveCamera(opts.fov || 42, 1, 0.1, 300);
+    cam.position.copy(viewPos(0)); cam.lookAt(CENTRE);
+    var group = new THREE.Group(); scene.add(group);
+    var ghost = new THREE.Group(); ghost.visible = false; scene.add(ghost);
+    var plateHit = new THREE.Mesh(new THREE.PlaneGeometry(GRID, GRID),
+      new THREE.MeshBasicMaterial({ visible:false, side:THREE.DoubleSide }));
+    plateHit.rotation.x = -Math.PI/2; plateHit.position.set(GRID/2, 0, GRID/2);
+    scene.add(plateHit);
+
+    var V = {
+      canvas:canvas, ren:ren, scene:scene, cam:cam, group:group, ghost:ghost,
+      plateHit:plateHit, viewIx:0, glide:null, cubes:[], famk:"none",
+      faceMode:"top", dim:false, live:true
+    };
+    V.paint = function(cubes, famk, o){
+      o = o || {};
+      V.cubes = cubes; V.famk = famk;
+      if (o.faceMode) V.faceMode = o.faceMode;
+      if (o.dim !== undefined) V.dim = o.dim;
+      while (group.children.length) group.remove(group.children[0]);
+      for (var i=0;i<cubes.length;i++){
+        var faint = null;
+        if (o.faintOthers && o.sel >= 0 && i !== o.sel) faint = o.faintOthers;
+        group.add(makeCube(cubes[i], famk, {
+          faint: faint,
+          sel: o.sel === i,
+          flag: o.flags ? o.flags[i] : null,
+          weight: o.weight, tint: o.tint,
+          style: o.styles ? o.styles[i] : null,
+          bright: (o.brightSel && o.sel === i) ? null
+                : brightFor(cubes, i, V.faceMode, V.dim && famk !== "none")
+        }));
+      }
+      if (o.ghosts) o.ghosts.forEach(function(q){
+        group.add(makeCube(q, famk, { faint: o.ghostOpacity || 0.30 }));
+      });
+    };
+    V.snapTo = function(i){
+      V.viewIx = i; V.glide = null;
+      cam.position.copy(viewPos(i)); cam.lookAt(CENTRE);
+    };
+    V.stepTo = function(i){
+      if (i === V.viewIx) return;
+      var diff = (i - V.viewIx + 4) % 4;
+      var legs = diff === 2 ? [(V.viewIx+1)%4, i] : [i];
+      V.glide = { legs:legs, li:0, from:cam.position.clone(), to:viewPos(legs[0]),
+                  t:0, dur:(diff===2?GLIDE_LEG:GLIDE_LONG)/1000 };
+      V.viewIx = i;
+    };
+    V.step = function(dt){
+      if (!V.glide) return;
+      V.glide.t += reduceMotion ? 1 : dt/V.glide.dur;
+      if (V.glide.t >= 1) V.glide.t = 1;
+      cam.position.lerpVectors(V.glide.from, V.glide.to, ease(V.glide.t));
+      cam.lookAt(CENTRE);
+      if (V.glide.t === 1){
+        V.glide.li++;
+        if (V.glide.li < V.glide.legs.length){
+          V.glide.from = cam.position.clone();
+          V.glide.to = viewPos(V.glide.legs[V.glide.li]);
+          V.glide.t = 0;
+        } else V.glide = null;
+      }
+    };
+    V.resize = function(){
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h || (w === V.lastW && h === V.lastH)) return;
+      V.lastW = w; V.lastH = h;
+      ren.setSize(w, h, false);
+      cam.aspect = w/h; cam.updateProjectionMatrix();
+    };
+    V.render = function(){
+      if (!canvas.clientWidth || !canvas.clientHeight) return;
+      ren.render(scene, cam);
+    };
+    V.screenFaces = function(){
+      var out = { se:2, sw:4, ne:5, nw:3 };
+      var camv = cam.position.clone().sub(CENTRE);
+      var vis = HORIZ.filter(function(d){
+        return DIRS[d][0]*camv.x + DIRS[d][2]*camv.z > 0;
+      });
+      if (vis.length !== 2) return out;
+      var proj = vis.map(function(d){
+        var p = CENTRE.clone().add(new THREE.Vector3(DIRS[d][0],0,DIRS[d][2]).multiplyScalar(2));
+        p.project(cam);
+        return { d:d, x:p.x };
+      });
+      proj.sort(function(a,b){ return a.x - b.x; });
+      out.sw = proj[0].d; out.se = proj[1].d;
+      out.ne = OPP[out.sw]; out.nw = OPP[out.se];
+      return out;
+    };
+    VIEWERS.push(V);
+    return V;
+  }
+  /* ==========================================================
+     M1. THE TESTBED ITSELF
+     Everything above this line is copied out of relay-260908.7,
+     unchanged except where a comment says MOBILE. Everything below
+     is new and exists only to answer one question: does placing a
+     cube on a phone feel right?
+     ========================================================== */
+  var STAMP = "260909.1";
+
+  var M = {
+    ix: 0,               // which design we are looking at
+    tool: "place",       // place | erase
+    colour: "y",
+    build: [],
+    gesture: "press",    // press | tap
+    pane: "build",       // build | design
+    theme: "dark",
+    taps: 0, misfires: 0 // a rough count, shown in the footer
+  };
+
+  var DV = null, BV = null;   // design viewer, build viewer
+  var PLATEMATS = [];         // baseplate materials, so the palette can recolour them
+
+  /* ---------- designs, read once through the maker's reader ---------- */
+  var MLIB = MDESIGNS.map(function(d){
+    return { id:d.id, family:d.family, name:d.name, tier:d.tier,
+             glyphs:d.glyphs, faces:d.faces, rule:d.rule,
+             cubes: toCubes(d.cubes, d.fixed) || [] };
+  });
+  function design(){ return MLIB[M.ix]; }
+
+  /* ---------- which column is under the finger ---------- */
+  /* The whole placement model: a tap names a COLUMN, never a cell. A cube
+     lands on top of that column and only the top cube of a column can be
+     taken off. There is no depth to get wrong. */
+  var mray = new THREE.Raycaster(), mndc = new THREE.Vector2();
+  function columnAt(V, cx, cy){
+    if (!V) return null;
+    var r = V.canvas.getBoundingClientRect();
+    if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null;
+    mndc.x = ((cx - r.left) / r.width) * 2 - 1;
+    mndc.y = -((cy - r.top) / r.height) * 2 + 1;
+    mray.setFromCamera(mndc, V.cam);
+    var targets = [V.plateHit], i;
+    for (i = 0; i < V.group.children.length; i++){
+      var b = V.group.children[i].userData.body;
+      if (b) targets.push(b);
+    }
+    var hits = mray.intersectObjects(targets, false);
+    if (!hits.length) return null;
+    var hit = hits[0], gx, gz;
+    if (hit.object === V.plateHit){
+      gx = Math.floor(hit.point.x); gz = Math.floor(hit.point.z);
+    } else {
+      var owner = hit.object.parent.userData.cube;
+      gx = owner.x; gz = owner.z;
+    }
+    if (gx < 0 || gx >= GRID || gz < 0 || gz >= GRID) return null;
+    return { x:gx, z:gz };
+  }
+
+
+  /* ---------- the preview ---------- */
+  function showTarget(V, t){
+    var g = V.ghost;
+    while (g.children.length) g.remove(g.children[0]);
+    if (!t){ g.visible = false; return; }
+    g.visible = true;
+    var col = t.kind === "cube" ? 0xD6453F : 0x4FB6C8;
+    /* a pad on the baseplate, so the column is legible even when the cube
+       itself is high up and behind a finger */
+    var pad = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.94),
+      new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.38,
+                                    depthWrite:false, side:THREE.DoubleSide }));
+    pad.rotation.x = -Math.PI/2;
+    pad.position.set(t.x + 0.5, 0.014, t.z + 0.5);
+    g.add(pad);
+    if (t.kind === "cube"){
+      var q = M.build[t.i];
+      var m = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({
+        color:col, transparent:true, opacity:0.30, depthWrite:false }));
+      m.position.set(q.x + 0.5, q.y + 0.5, q.z + 0.5); m.scale.setScalar(1.06);
+      g.add(m);
+      var l = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color:col }));
+      l.position.copy(m.position); l.scale.setScalar(1.06);
+      g.add(l);
+    } else {
+      g.add(makeCube({ x:t.x, y:t.y, z:t.z, c:M.colour, fixed:false, o:0 },
+                     "none", { faint:0.55 }));
+    }
+  }
+
+  function commit(t){
+    if (!t){ M.misfires++; footer(); return; }
+    M.build = applyTarget(M.build, t, M.colour);
+    M.taps++;
+    paint();
+  }
+
+  /* ---------- the gesture ---------- */
+  /* One model everywhere. Press, slide, lift. A quick tap is a zero-length
+     slide, so a confident player never notices the difference. In TAP mode
+     the commit happens on the way down instead, with no preview, which is
+     the thing we are comparing against. */
+  var G = { on:false, t:null, overStage:false };
+
+  function inStage(ev){
+    var r = BV ? BV.canvas.getBoundingClientRect() : null;
+    if (!r || !r.width) return false;
+    return ev.clientX >= r.left && ev.clientX <= r.right &&
+           ev.clientY >= r.top  && ev.clientY <= r.bottom;
+  }
+
+  function gdown(ev, swatch){
+    if (swatch){ M.colour = swatch; paintSwatches(); }
+    if (M.pane !== "build") return;
+    if (M.gesture === "tap"){
+      if (!swatch) commit(targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY)));
+      return;
+    }
+    G.on = true;
+    G.overStage = inStage(ev);
+    G.t = targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY));
+    showTarget(BV, G.t);
+  }
+  function gmove(ev){
+    if (!G.on) return;
+    if (inStage(ev)) G.overStage = true;
+    G.t = targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY));
+    showTarget(BV, G.t);
+  }
+  function gup(){
+    if (!G.on) return;
+    G.on = false;
+    var t = G.t, over = G.overStage;
+    G.t = null; G.overStage = false;
+    showTarget(BV, null);
+    /* lifting off without ever reaching the baseplate is a cancel, not a miss */
+    if (!t && !over) return;
+    commit(t);
+  }
+
+  /* ---------- painting ---------- */
+  function paint(){
+    if (BV) BV.paint(M.build, "none", {});
+    if (DV) DV.paint(design().cubes, "none", {});
+    el("mDesign").textContent = (M.ix + 1) + " of " + MLIB.length;
+    el("mCount").textContent = M.build.length + (M.build.length === 1 ? " cube" : " cubes");
+    el("mVerdict").textContent = "";
+    el("mVerdict").className = "verdict";
+    footer();
+  }
+  function paintSwatches(){
+    CKEYS.forEach(function(k){
+      var b = el("sw-" + k);
+      b.classList.toggle("on", k === M.colour);
+      b.classList.toggle("off", M.tool === "erase");
+    });
+  }
+  function paintTool(){
+    el("tPlace").classList.toggle("on", M.tool === "place");
+    el("tErase").classList.toggle("on", M.tool === "erase");
+    paintSwatches();
+  }
+  function paintPane(){
+    el("paneBuild").classList.toggle("on", M.pane === "build");
+    el("paneDesign").classList.toggle("on", M.pane === "design");
+    el("cvBuild").style.display  = M.pane === "build"  ? "block" : "none";
+    el("cvDesign").style.display = M.pane === "design" ? "block" : "none";
+    el("builderBar").style.visibility = M.pane === "build" ? "visible" : "hidden";
+  }
+  function footer(){
+    el("mFoot").textContent =
+      "grid " + GRID + "x" + GRID + " · height " + MAXY +
+      " · " + M.taps + " placed · " + M.misfires + " missed · " + STAMP;
+  }
+
+  /* ---------- the palette ---------- */
+  var PLATE = { line:0x5B7288, edge:0x74C6D8 };
+  function theme(next){
+    M.theme = next;
+    document.documentElement.setAttribute("data-theme", next);
+    var line = next === "light" ? 0x9AAAB8 : 0x5B7288;
+    var edge = next === "light" ? 0x2C7F90 : 0x74C6D8;
+    PLATE.line = line; PLATE.edge = edge;
+    PLATEMATS.forEach(function(p){ p.line.color.setHex(line); p.edge.color.setHex(edge); });
+    el("bTheme").textContent = next === "light" ? "DARK" : "LIGHT";
+  }
+
+  /* ---------- keeping the screen awake ---------- */
+  /* The Architect will hold a phone for two minutes without touching it. */
+  var wake = null;
+  function keepAwake(){
+    if (!("wakeLock" in navigator)) { el("mWake").textContent = "no wake lock"; return; }
+    navigator.wakeLock.request("screen").then(function(w){
+      wake = w; el("mWake").textContent = "awake";
+      w.addEventListener("release", function(){ el("mWake").textContent = "released"; });
+    }).catch(function(e){ el("mWake").textContent = "wake lock refused"; });
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible") keepAwake();
+  });
+
+  /* ---------- wiring ---------- */
+  function el(id){ return document.getElementById(id); }
+  function on(id, fn){ el(id).addEventListener("click", fn); }
+
+  function boot(){
+    DV = makeViewer(el("cvDesign"), { fov:46 });
+    BV = makeViewer(el("cvBuild"),  { fov:46 });
+
+    /* the four presets, stepped one button at a time */
+    on("bView", function(){
+      var V = M.pane === "build" ? BV : DV;
+      var nx = (V.viewIx + 1) % 4;
+      V.stepTo(nx);
+      el("bView").textContent = "VIEW " + (nx + 1);
+    });
+
+    on("paneBuild",  function(){ M.pane = "build";  paintPane(); });
+    on("paneDesign", function(){ M.pane = "design"; paintPane(); });
+    on("tPlace", function(){ M.tool = "place"; paintTool(); });
+    on("tErase", function(){ M.tool = "erase"; paintTool(); });
+
+    CKEYS.forEach(function(k){
+      var b = el("sw-" + k);
+      b.style.background = colInfo(k).hex;
+      b.addEventListener("pointerdown", function(ev){
+        ev.preventDefault();
+        try { b.setPointerCapture(ev.pointerId); } catch(e){}
+        gdown(ev, k);
+      });
+    });
+
+    var stage = el("stage");
+    stage.addEventListener("pointerdown", function(ev){
+      ev.preventDefault();
+      try { stage.setPointerCapture(ev.pointerId); } catch(e){}
+      gdown(ev, null);
+    });
+    window.addEventListener("pointermove", function(ev){
+      if (G.on){ ev.preventDefault(); gmove(ev); }
+    }, { passive:false });
+    window.addEventListener("pointerup", gup);
+    window.addEventListener("pointercancel", function(){ G.on = false; showTarget(BV, null); });
+
+    on("bCheck", function(){
+      if (!M.build.length){
+        el("mVerdict").textContent = "Nothing built yet.";
+        el("mVerdict").className = "verdict"; return;
+      }
+      var v = verdictOf(design(), M.build);
+      var df = diffOf(design(), M.build);
+      var wrong = df.extra + df.missing + df.color;
+      el("mVerdict").textContent = v === "PERFECT"
+        ? "PERFECT · nothing out of place"
+        : v + " · " + (wrong === 1 ? "1 cube wrong" : wrong + " cubes wrong");
+      el("mVerdict").className = "verdict " + (v === "PERFECT" ? "good" : "bad");
+    });
+    on("bClear", function(){ M.build = []; paint(); });
+    on("bNext",  function(){ M.ix = (M.ix + 1) % MLIB.length; M.build = []; paint(); });
+    on("bGesture", function(){
+      M.gesture = M.gesture === "press" ? "tap" : "press";
+      el("bGesture").textContent = M.gesture === "press" ? "PRESS + SLIDE" : "TAP";
+    });
+    on("bTheme", function(){ theme(M.theme === "light" ? "dark" : "light"); });
+
+    theme("dark");
+    paintTool(); paintPane(); paint();
+    keepAwake();
+
+    /* never let one throw stop the loop — brief §10 */
+    var last = performance.now();
+    (function frame(now){
+      try {
+        var dt = Math.min(0.05, (now - last) / 1000); last = now;
+        VIEWERS.forEach(function(V){
+          try { V.resize(); V.step(dt); V.render(); } catch(e){}
+        });
+      } finally { requestAnimationFrame(frame); }
+    })(last);
+  }
+
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+
+})();
+</script>
+</body>
+</html>
