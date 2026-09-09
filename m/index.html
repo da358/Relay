@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.2</title>
+<title>Relay mobile touch testbed 260909.3</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -37,8 +37,9 @@
   }
   header h1{
     margin:0; font-size:calc(17px * var(--ts)); font-weight:800;
-    letter-spacing:.10em; flex:1 1 auto;
+    letter-spacing:.10em; flex:1 1 auto; white-space:nowrap;
   }
+  header .seg button{ padding:10px 12px; min-width:64px; font-size:calc(13px * var(--ts)); }
   header h1 em{ font-style:normal; font-weight:500; color:var(--dim);
                 letter-spacing:.02em; font-size:calc(13px * var(--ts)); }
 
@@ -62,9 +63,16 @@
     background:var(--panel); touch-action:none; overflow:hidden;
   }
   #stage canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
-  #paneRow{
+  /* the view control sits in the slot the testbed's pane toggle vacates, so
+     what you are looking at here is where it lands in the real game */
+  #viewRow{
     position:absolute; top:10px; left:10px; z-index:3;
-    background:var(--panel); border-radius:10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  #viewHint{
+    color:var(--dim); font-size:calc(12px * var(--ts));
+    line-height:1.18; font-weight:600; text-align:left;
+    padding-left:2px;
   }
   #stageInfo{
     position:absolute; top:16px; right:12px; z-index:3;
@@ -100,20 +108,31 @@
     color:var(--dim); font-size:calc(12px * var(--ts));
   }
   footer #mFoot{ flex:1 1 auto; }
+
+  /* the cube you are carrying: follows the finger, never intercepts it */
+  #carry{
+    position:fixed; display:none; z-index:40; pointer-events:none;
+    width:54px; height:58px; margin-left:-27px; margin-top:-29px;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.38));
+  }
+  #carry svg{ display:block; width:100%; height:100%; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>RELAY <em>touch testbed</em></h1>
-  <button class="k" id="bView">VIEW 1</button>
+  <div class="seg" id="paneRow">
+    <button id="paneBuild" class="on">BUILD</button>
+    <button id="paneDesign">DESIGN</button>
+  </div>
   <button class="k" id="bTheme">DARK</button>
 </header>
 
 <div id="stage">
-  <div class="seg" id="paneRow">
-    <button id="paneBuild" class="on">BUILD</button>
-    <button id="paneDesign">DESIGN</button>
+  <div id="viewRow">
+    <button class="k" id="bView">VIEW 1</button>
+    <span id="viewHint">Tap to<br>change<br>views</span>
   </div>
   <div id="stageInfo">design <span id="mDesign">1 of 20</span></div>
   <canvas id="cvBuild"></canvas>
@@ -141,6 +160,8 @@
     <span style="color:var(--dim); font-size:calc(13px * var(--ts))" id="mCount">0 cubes</span>
   </div>
 </div>
+
+<div id="carry"></div>
 
 <footer>
   <span id="mFoot"></span>
@@ -998,7 +1019,7 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.2";
+  var STAMP = "260909.3";
 
   var M = {
     ix: 0,               // which design we are looking at
@@ -1019,7 +1040,12 @@
      Motion switched on gets a shorter turn, not no turn. Section 13's own
      skip is neutralised here rather than edited there. */
   var MOTION_REDUCED = reduceMotion;
-  if (MOTION_REDUCED){ GLIDE_LONG = 400; GLIDE_LEG = 280; reduceMotion = false; }
+  /* One speed for every phone. Two players on one team must not see the board
+     turn at different rates because one of them has an accessibility setting
+     on. Reduce Motion still shortens it; it never removes it. Two numbers. */
+  var TURN_MS = MOTION_REDUCED ? 320 : 500;
+  GLIDE_LONG = TURN_MS; GLIDE_LEG = Math.round(TURN_MS * 0.7);
+  reduceMotion = false;
   var PLATEMATS = [];         // baseplate materials, so the palette can recolour them
 
   /* ---------- designs, read once through the maker's reader ---------- */
@@ -1098,12 +1124,38 @@
     paint();
   }
 
+  /* ---------- the cube you are carrying ---------- */
+  /* Picked up from a swatch, it follows the finger until the board offers it
+     somewhere to land, at which point the 3D preview takes over and the
+     carried cube disappears — the cube has arrived. Offset above the finger,
+     because a thumb covers whatever is directly beneath it. */
+  var CARRY_LIFT = 52;
+  function carryShow(colour){
+    var c = el("carry");
+    c.innerHTML = cubeSVG(colInfo(colour).hex);
+    c.style.display = "block";
+  }
+  function carryMoveTo(x, y){
+    var c = el("carry");
+    c.style.left = x + "px";
+    c.style.top  = (y - CARRY_LIFT) + "px";
+  }
+  function carryHide(){ el("carry").style.display = "none"; }
+
   /* ---------- the gesture ---------- */
   /* One model everywhere. Press, slide, lift. A quick tap is a zero-length
      slide, so a confident player never notices the difference. In TAP mode
      the commit happens on the way down instead, with no preview, which is
      the thing we are comparing against. */
-  var G = { on:false, t:null, overStage:false };
+  var G = { on:false, t:null, overStage:false, fromSwatch:false };
+
+  /* the carried cube hands over to the 3D preview the moment there is a real
+     landing place, and takes back over if the finger wanders off it */
+  function carryUpdate(){
+    if (!G.on || !G.fromSwatch){ carryHide(); return; }
+    var c = el("carry");
+    c.style.display = (G.t && G.t.kind === "cell") ? "none" : "block";
+  }
 
   function inStage(ev){
     var r = BV ? BV.canvas.getBoundingClientRect() : null;
@@ -1113,29 +1165,39 @@
   }
 
   function gdown(ev, swatch){
-    if (swatch){ M.colour = swatch; paintSwatches(); }
+    if (swatch){
+      M.colour = swatch;
+      /* picking up a cube means you intend to put one down */
+      if (M.tool === "erase"){ M.tool = "place"; paintTool(); }
+      paintSwatches();
+    }
     if (M.pane !== "build") return;
     if (M.gesture === "tap"){
       if (!swatch) commit(targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY)));
       return;
     }
     G.on = true;
+    G.fromSwatch = !!swatch;
     G.overStage = inStage(ev);
     G.t = targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY));
     showTarget(BV, G.t);
+    if (G.fromSwatch){ carryShow(M.colour); carryMoveTo(ev.clientX, ev.clientY); }
+    carryUpdate();
   }
   function gmove(ev){
     if (!G.on) return;
     if (inStage(ev)) G.overStage = true;
     G.t = targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY));
     showTarget(BV, G.t);
+    if (G.fromSwatch) carryMoveTo(ev.clientX, ev.clientY);
+    carryUpdate();
   }
   function gup(){
     if (!G.on) return;
     G.on = false;
     var t = G.t, over = G.overStage;
-    G.t = null; G.overStage = false;
-    showTarget(BV, null);
+    G.t = null; G.overStage = false; G.fromSwatch = false;
+    showTarget(BV, null); carryHide();
     /* lifting off without ever reaching the baseplate is a cancel, not a miss */
     if (!t && !over) return;
     commit(t);
@@ -1273,6 +1335,7 @@
       b.addEventListener("pointerdown", function(ev){
         ev.preventDefault();
         try { b.setPointerCapture(ev.pointerId); } catch(e){}
+        keepAwakeOnGesture();
         gdown(ev, k);
       });
     });
@@ -1288,7 +1351,9 @@
       if (G.on){ ev.preventDefault(); gmove(ev); }
     }, { passive:false });
     window.addEventListener("pointerup", gup);
-    window.addEventListener("pointercancel", function(){ G.on = false; showTarget(BV, null); });
+    window.addEventListener("pointercancel", function(){
+      G.on = false; G.fromSwatch = false; showTarget(BV, null); carryHide();
+    });
 
     on("bCheck", function(){
       if (!M.build.length){
@@ -1315,7 +1380,7 @@
        test-m-logic, which cannot see inside this closure otherwise */
     window.RELAY_M = { stamp:STAMP, grid:GRID, maxy:MAXY,
                        motionReduced:MOTION_REDUCED, glideLong:GLIDE_LONG,
-                       glideLeg:GLIDE_LEG, skipsGlide:reduceMotion,
+                       glideLeg:GLIDE_LEG, skipsGlide:reduceMotion, turnMs:TURN_MS,
                        designs:MLIB.length, secure:window.isSecureContext };
     theme("light");
     paintTool(); paintPane(); paint();
