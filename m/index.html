@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.1</title>
+<title>Relay mobile touch testbed 260909.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -74,13 +74,14 @@
   #builderBar{ flex:0 0 auto; padding:10px 12px 4px; }
   #swatches{ display:flex; gap:10px; margin:12px 0 0; }
   #swatches button{
-    flex:1 1 0; height:60px; border-radius:12px;
-    border:3px solid transparent; position:relative;
-    box-shadow:inset 0 -10px 0 rgba(0,0,0,.22), inset 0 10px 0 rgba(255,255,255,.14);
+    flex:1 1 0; height:66px; padding:3px; border-radius:12px;
+    border:3px solid transparent; background:transparent;
+    display:flex; align-items:center; justify-content:center;
     touch-action:none;
   }
-  #swatches button.on{ border-color:var(--paper); }
-  #swatches button.off{ opacity:.32; }
+  #swatches button.on{ border-color:var(--paper); background:var(--raise); }
+  #swatches button.off{ opacity:.30; }
+  #swatches svg{ display:block; width:100%; height:100%; pointer-events:none; }
 
   #actions{ display:flex; gap:8px; margin-top:12px; }
   #actions button{ flex:1 1 0; }
@@ -106,7 +107,7 @@
 <header>
   <h1>RELAY <em>touch testbed</em></h1>
   <button class="k" id="bView">VIEW 1</button>
-  <button class="k" id="bTheme">LIGHT</button>
+  <button class="k" id="bTheme">DARK</button>
 </header>
 
 <div id="stage">
@@ -997,7 +998,7 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.1";
+  var STAMP = "260909.2";
 
   var M = {
     ix: 0,               // which design we are looking at
@@ -1011,6 +1012,14 @@
   };
 
   var DV = null, BV = null;   // design viewer, build viewer
+
+  /* MOBILE: on a phone the camera turn is information, not decoration — it is
+     the only thing that says which way the board went, and an instant cut
+     leaves the player re-reading the whole build. So a phone with Reduce
+     Motion switched on gets a shorter turn, not no turn. Section 13's own
+     skip is neutralised here rather than edited there. */
+  var MOTION_REDUCED = reduceMotion;
+  if (MOTION_REDUCED){ GLIDE_LONG = 400; GLIDE_LEG = 280; reduceMotion = false; }
   var PLATEMATS = [];         // baseplate materials, so the palette can recolour them
 
   /* ---------- designs, read once through the maker's reader ---------- */
@@ -1163,8 +1172,36 @@
   }
   function footer(){
     el("mFoot").textContent =
-      "grid " + GRID + "x" + GRID + " · height " + MAXY +
-      " · " + M.taps + " placed · " + M.misfires + " missed · " + STAMP;
+      GRID + "x" + GRID + "x" + MAXY +
+      " · " + M.taps + " placed · " + M.misfires + " missed" +
+      " · motion " + (MOTION_REDUCED ? "reduced" : "full") +
+      " · " + STAMP;
+  }
+
+  /* ---------- a swatch is a cube, not a square ---------- */
+  /* Three faces of one colour, so the control looks like the thing it puts on
+     the board. Lit the same way as the scene: top brightest, right darkest. */
+  function shade(hex, amt){
+    var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16),
+        b = parseInt(hex.slice(5,7),16);
+    var f = function(v){
+      v = amt > 0 ? v + (255 - v) * amt : v * (1 + amt);
+      return Math.max(0, Math.min(255, Math.round(v)));
+    };
+    return "rgb(" + f(r) + "," + f(g) + "," + f(b) + ")";
+  }
+  function cubeSVG(hex){
+    var top = shade(hex, 0.20), left = shade(hex, -0.10), right = shade(hex, -0.34);
+    return '<svg viewBox="0 0 100 108" width="100%" height="100%" ' +
+      'preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+      '<polygon points="50,6 92,30 50,54 8,30" fill="' + top + '"/>' +
+      '<polygon points="8,30 50,54 50,102 8,78" fill="' + left + '"/>' +
+      '<polygon points="92,30 92,78 50,102 50,54" fill="' + right + '"/>' +
+      '<path d="M50,6 92,30 92,78 50,102 8,78 8,30Z" fill="none" ' +
+      'stroke="rgba(0,0,0,.45)" stroke-width="3" stroke-linejoin="round"/>' +
+      '<path d="M8,30 50,54 92,30 M50,54 50,102" fill="none" ' +
+      'stroke="rgba(0,0,0,.28)" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '</svg>';
   }
 
   /* ---------- the palette ---------- */
@@ -1183,11 +1220,27 @@
   /* The Architect will hold a phone for two minutes without touching it. */
   var wake = null;
   function keepAwake(){
-    if (!("wakeLock" in navigator)) { el("mWake").textContent = "no wake lock"; return; }
+    if (!("wakeLock" in navigator)){
+      el("mWake").textContent = "no wake lock api"; return;
+    }
+    /* the API is refused outright off HTTPS, which is what a file opened from
+       Mail or Files is. Say that rather than "refused", which sends the next
+       hour in the wrong direction. Brief §11. */
+    if (window.isSecureContext === false){
+      el("mWake").textContent = "wake lock needs https"; return;
+    }
     navigator.wakeLock.request("screen").then(function(w){
       wake = w; el("mWake").textContent = "awake";
-      w.addEventListener("release", function(){ el("mWake").textContent = "released"; });
-    }).catch(function(e){ el("mWake").textContent = "wake lock refused"; });
+      w.addEventListener("release", function(){
+        wake = null; el("mWake").textContent = "released";
+      });
+    }).catch(function(e){
+      /* the browser's own words, not a guess at what they mean */
+      el("mWake").textContent = "wake: " + (e && (e.name || e.message) || "refused");
+    });
+  }
+  function keepAwakeOnGesture(){
+    if (!wake) keepAwake();
   }
   document.addEventListener("visibilitychange", function(){
     if (document.visibilityState === "visible") keepAwake();
@@ -1216,7 +1269,7 @@
 
     CKEYS.forEach(function(k){
       var b = el("sw-" + k);
-      b.style.background = colInfo(k).hex;
+      b.innerHTML = cubeSVG(colInfo(k).hex);
       b.addEventListener("pointerdown", function(ev){
         ev.preventDefault();
         try { b.setPointerCapture(ev.pointerId); } catch(e){}
@@ -1228,6 +1281,7 @@
     stage.addEventListener("pointerdown", function(ev){
       ev.preventDefault();
       try { stage.setPointerCapture(ev.pointerId); } catch(e){}
+      keepAwakeOnGesture();
       gdown(ev, null);
     });
     window.addEventListener("pointermove", function(ev){
@@ -1257,7 +1311,13 @@
     });
     on("bTheme", function(){ theme(M.theme === "light" ? "dark" : "light"); });
 
-    theme("dark");
+    /* a readable record of what the phone decided, for the console and for
+       test-m-logic, which cannot see inside this closure otherwise */
+    window.RELAY_M = { stamp:STAMP, grid:GRID, maxy:MAXY,
+                       motionReduced:MOTION_REDUCED, glideLong:GLIDE_LONG,
+                       glideLeg:GLIDE_LEG, skipsGlide:reduceMotion,
+                       designs:MLIB.length, secure:window.isSecureContext };
+    theme("light");
     paintTool(); paintPane(); paint();
     keepAwake();
 
