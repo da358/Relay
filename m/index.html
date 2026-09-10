@@ -4,19 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.8</title>
+<title>Relay 260909.9</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
   :root{
+    --bg:#FFFFFF; --paper:#0F1519; --dim:#54626F;
+    --panel:#F4F7FA; --rule:#C7D2DC; --raise:#E4EBF1;
+    --cyan:#0B6A7A; --red:#A8221B; --green:#256E2A; --ts:1;
+  }
+  :root[data-theme="dark"]{
     --bg:#070B0F; --paper:#E6EDF3; --dim:#8A9AAB;
     --panel:#0E141B; --rule:#26333F; --raise:#151D26;
     --cyan:#4FB6C8; --red:#D6453F; --green:#4FA557;
-    --ts:1;
-  }
-  :root[data-theme="light"]{
-    --bg:#FFFFFF; --paper:#0F1519; --dim:#54626F;
-    --panel:#F4F7FA; --rule:#C7D2DC; --raise:#E4EBF1;
-    --cyan:#0B6A7A; --red:#A8221B; --green:#256E2A;
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ margin:0; padding:0; height:100%; overscroll-behavior:none; }
@@ -24,182 +25,329 @@
     background:var(--bg); color:var(--paper);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     font-size:calc(17px * var(--ts));
-    display:flex; flex-direction:column;
-    height:100dvh; width:100%;
+    height:100dvh; width:100%; touch-action:manipulation;
+  }
+  .screen{
+    display:none; flex-direction:column; height:100dvh; width:100%;
     padding:env(safe-area-inset-top) env(safe-area-inset-right)
             env(safe-area-inset-bottom) env(safe-area-inset-left);
-    touch-action:manipulation;
   }
 
-  header{
-    display:flex; align-items:center; gap:8px;
-    padding:10px 12px; border-bottom:1px solid var(--rule); flex:0 0 auto;
+  /* ---------- shared controls ---------- */
+  button.big{
+    appearance:none; border:1px solid var(--rule); border-radius:14px;
+    background:var(--cyan); color:#fff; font:inherit; font-weight:800;
+    font-size:calc(19px * var(--ts)); letter-spacing:.06em;
+    padding:20px 16px; width:100%; min-height:62px;
   }
-  header h1{
-    margin:0; font-size:calc(17px * var(--ts)); font-weight:800;
-    letter-spacing:.10em; flex:1 1 auto; white-space:nowrap;
-  }
-  header .seg button{ padding:10px 12px; min-width:64px; font-size:calc(13px * var(--ts)); }
-  header h1 em{ font-style:normal; font-weight:500; color:var(--dim);
-                letter-spacing:.02em; font-size:calc(13px * var(--ts)); }
-  /* the testbed label is the first thing to go on a narrow phone; none of it
-     exists in the real game, so it must never squeeze a real control */
-  @media (max-width:400px){ header h1 em{ display:none; } }
-
-  .seg{ display:flex; border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
-  .seg button{
-    appearance:none; border:0; background:transparent; color:var(--dim);
-    font:inherit; font-weight:700; font-size:calc(15px * var(--ts));
-    padding:12px 16px; min-height:48px; min-width:76px;
-  }
-  .seg button.on{ background:var(--cyan); color:var(--bg); }
-
+  button.big.plain{ background:var(--raise); color:var(--paper); }
+  button.big:disabled{ opacity:.42; }
   button.k{
     appearance:none; border:1px solid var(--rule); border-radius:10px;
-    background:var(--raise); color:var(--paper);
-    font:inherit; font-weight:700; font-size:calc(15px * var(--ts));
-    padding:12px 14px; min-height:48px;
+    background:var(--raise); color:var(--paper); font:inherit; font-weight:700;
+    font-size:calc(14px * var(--ts)); padding:10px 12px; min-height:44px;
   }
+  .seg{ display:flex; gap:10px; }
+  .seg button{
+    flex:1; appearance:none; border:2px solid var(--rule); border-radius:12px;
+    background:var(--raise); color:var(--dim); font:inherit; font-weight:800;
+    font-size:calc(16px * var(--ts)); padding:16px 8px; min-height:58px;
+  }
+  .seg button.on{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
+  label{ display:block; margin:18px 0 0; font-size:calc(13px * var(--ts));
+         font-weight:700; letter-spacing:.10em; color:var(--dim); }
+  input{
+    width:100%; margin-top:8px; padding:16px 14px; min-height:58px;
+    border:1px solid var(--rule); border-radius:12px;
+    background:var(--panel); color:var(--paper);
+    font:inherit; font-size:calc(19px * var(--ts));
+  }
+  .err{ margin-top:14px; color:var(--red); font-size:calc(15px * var(--ts)); min-height:22px; }
+  .pad{ padding:22px 20px; }
+  .grow{ flex:1 1 auto; }
 
-  #stage{
-    position:relative; flex:1 1 auto; min-height:52vh;
-    background:var(--panel); touch-action:none; overflow:hidden;
+  /* ---------- landing ---------- */
+  #scLanding{ justify-content:center; align-items:center; text-align:center; padding:24px; }
+  #scLanding h1{ font-size:calc(52px * var(--ts)); letter-spacing:.16em;
+                 margin:0 0 44px; font-weight:900; }
+  #scLanding .stack{ width:100%; max-width:420px; display:flex; flex-direction:column; gap:16px; }
+  .copy{ position:absolute; bottom:calc(14px + env(safe-area-inset-bottom));
+         color:var(--dim); font-size:calc(12px * var(--ts)); }
+  #resume{ display:none; margin-top:26px; }
+  #resumeWho{ display:block; color:var(--dim); font-size:calc(13px * var(--ts)); margin-top:8px; }
+  #resumeDrop{ margin-top:10px; background:none; border:0; color:var(--dim);
+               font:inherit; font-size:calc(13px * var(--ts)); text-decoration:underline; }
+
+  /* ---------- lobby ---------- */
+  #scLobby{ padding:22px 20px; text-align:center; }
+  #lobRound{ color:var(--dim); font-size:calc(13px * var(--ts));
+             letter-spacing:.10em; font-weight:700; }
+  #lobIntro{ margin:18px 0 6px; }
+  #lobCode{ font-size:calc(52px * var(--ts)); font-weight:900; letter-spacing:.14em;
+            margin:6px 0; }
+  #lobShare{ color:var(--dim); }
+  #lobWait{ margin-top:28px; color:var(--dim); }
+  #lobPick{ margin-top:30px; }
+  #lobPick p, #lobTold{ margin:0 0 14px; }
+  #lobTold{ margin-top:30px; }
+  #lobReady{ margin-top:auto; }
+  #lobHint{ color:var(--dim); font-size:calc(13px * var(--ts)); min-height:20px; margin-top:10px; }
+
+  /* ---------- play and debrief ---------- */
+  .bar{
+    display:flex; align-items:center; gap:8px; padding:9px 12px;
+    border-bottom:1px solid var(--rule); flex:0 0 auto;
+    font-size:calc(12px * var(--ts)); color:var(--dim);
   }
-  #stage canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
-  /* the view control sits in the slot the testbed's pane toggle vacates, so
-     what you are looking at here is where it lands in the real game */
-  #viewRow{
+  .bar .who{ flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+             font-weight:700; color:var(--paper); }
+  .bar .clock{ font-weight:800; font-size:calc(17px * var(--ts)); color:var(--paper);
+               font-variant-numeric:tabular-nums; }
+  .bar .sess{ white-space:nowrap; }
+  .nethint{ color:var(--dim); }
+  .nethint.off{ color:var(--red); font-weight:700; }
+  .tools{ display:flex; align-items:center; gap:8px; padding:8px 12px 0; flex:0 0 auto; }
+  .tools .hint{ color:var(--dim); font-size:calc(12px * var(--ts)); line-height:1.18; }
+
+  #stage, #dbDesign, #dbBuild{
+    position:relative; background:var(--panel); touch-action:none; overflow:hidden;
+  }
+  #stage{ flex:1 1 auto; min-height:52vh; }
+  .viewRow{
     position:absolute; top:10px; left:10px; z-index:3;
     display:flex; align-items:center; gap:10px;
   }
-  #viewHint{
-    color:var(--dim); font-size:calc(12px * var(--ts));
-    line-height:1.18; font-weight:600; text-align:left;
-    padding-left:2px;
+  .viewRow .hint{ color:var(--dim); font-size:calc(12px * var(--ts));
+                  line-height:1.18; font-weight:600; text-align:left; padding-left:2px; }
+  #dbView{ position:absolute; top:8px; right:10px; z-index:3; }
+  #dbDesign, #dbBuild{ flex:1 1 50%; min-height:24vh; }
+  #stage canvas, #dbDesign canvas, #dbBuild canvas{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
   }
-  #stageInfo{
-    position:absolute; top:12px; right:12px; z-index:3;
-    color:var(--dim); font-size:calc(13px * var(--ts)); font-weight:600;
-    text-align:right; line-height:1.18;
+  .pill{
+    position:absolute; top:8px; left:10px; z-index:3;
+    background:var(--raise); border:1px solid var(--rule); border-radius:999px;
+    padding:5px 12px; font-size:calc(11px * var(--ts)); font-weight:800;
+    letter-spacing:.10em; color:var(--paper);
+  }
+  #plArchNote{
+    position:absolute; bottom:10px; left:0; right:0; text-align:center; z-index:3;
+    color:var(--dim); font-size:calc(13px * var(--ts));
   }
 
-  #builderBar{ flex:0 0 auto; padding:8px 12px 2px; }
+  #builderBar{ flex:0 0 auto; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); }
   #swatches{ display:flex; gap:10px; margin:9px 0 0; }
   #swatches button{
-    flex:1 1 0; height:66px; padding:3px; border-radius:12px;
+    flex:1 1 0; height:64px; padding:3px; border-radius:12px;
     border:3px solid transparent; background:transparent;
-    display:flex; align-items:center; justify-content:center;
-    touch-action:none;
+    display:flex; align-items:center; justify-content:center; touch-action:none;
   }
   #swatches button.on{ border-color:var(--paper); background:var(--raise); }
   #swatches button.off{ opacity:.30; }
   #swatches svg{ display:block; width:100%; height:100%; pointer-events:none; }
+  #bSubmit{ margin-top:10px; }
+  #mCount{ color:var(--dim); font-size:calc(12px * var(--ts)); }
 
-  #actions{ display:flex; gap:8px; margin-top:9px; }
-  #actions button{ flex:1 1 0; }
-
-  .verdict{
-    margin:9px 0 0; min-height:calc(22px * var(--ts));
-    font-weight:800; font-size:calc(17px * var(--ts)); letter-spacing:.04em;
-  }
+  #dbFoot{ flex:0 0 auto; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .verdict{ font-weight:900; letter-spacing:.06em; font-size:calc(20px * var(--ts)); }
   .verdict.good{ color:var(--green); }
   .verdict.bad{ color:var(--red); }
+  #dbErrors{ margin-top:4px; font-size:calc(15px * var(--ts)); }
+  #dbTap{ margin-top:4px; min-height:20px; color:var(--dim); font-size:calc(13px * var(--ts)); }
+  #dbGo{ margin-top:10px; }
 
-  footer{
-    flex:0 0 auto; display:flex; align-items:center; gap:10px;
-    padding:8px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top:1px solid var(--rule);
-    color:var(--dim); font-size:calc(12px * var(--ts));
+  /* ---------- modal and carry ---------- */
+  #modal{
+    display:none; position:fixed; inset:0; z-index:60;
+    background:rgba(0,0,0,.55); align-items:center; justify-content:center; padding:24px;
   }
-  footer #mFoot{ flex:1 1 auto; }
-
-  /* testbed only: the model switch does not exist in the real game */
-  #fitBar{
-    flex:0 0 auto; display:flex; align-items:center; gap:6px;
-    padding:6px 12px 0; color:var(--dim);
-    font-size:calc(11px * var(--ts)); white-space:nowrap;
+  #modBox{
+    background:var(--bg); border:1px solid var(--rule); border-radius:18px;
+    padding:24px; width:100%; max-width:420px; text-align:center;
   }
-  #fitBar .lbl{ font-weight:700; letter-spacing:.08em; }
-  #fitBar #mModelNote{ overflow:hidden; text-overflow:ellipsis; }
-  button.tiny{
-    appearance:none; border:1px solid var(--rule); border-radius:8px;
-    background:var(--raise); color:var(--paper);
-    font:inherit; font-weight:700; font-size:calc(11px * var(--ts));
-    padding:7px 8px; min-height:34px;
-  }
-
-  /* the cube you are carrying: follows the finger, never intercepts it */
+  #modHead{ font-weight:800; font-size:calc(19px * var(--ts)); }
+  #modBody{ margin:10px 0 22px; color:var(--dim); }
+  #modBtns{ display:flex; gap:12px; }
+  #modBtns button{ flex:1; }
   #carry{
     position:fixed; display:none; z-index:40; pointer-events:none;
     width:54px; height:58px; margin-left:-27px; margin-top:-29px;
     filter:drop-shadow(0 6px 10px rgba(0,0,0,.38));
   }
   #carry svg{ display:block; width:100%; height:100%; }
+  #boom{
+    display:none; position:fixed; left:0; right:0; bottom:0; z-index:80;
+    background:var(--red); color:#fff; padding:12px 14px;
+    font-size:calc(13px * var(--ts));
+  }
+  #boom.on{ display:block; }
+  #boom button{ float:right; background:none; border:1px solid #fff; color:#fff;
+                border-radius:8px; font:inherit; padding:4px 10px; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>RELAY <em>touch testbed</em></h1>
-  <div class="seg" id="paneRow">
-    <button id="paneBuild" class="on">BUILD</button>
-    <button id="paneDesign">DESIGN</button>
+<!-- ============ LANDING ============ -->
+<section class="screen" id="scLanding">
+  <h1>RELAY</h1>
+  <div class="stack">
+    <button class="big" id="goCreate">CREATE A TEAM</button>
+    <button class="big plain" id="goJoin">JOIN A TEAM</button>
+    <div id="resume">
+      <button class="big plain" id="resumeBtn">REJOIN</button>
+      <span id="resumeWho"></span>
+      <button id="resumeDrop">forget this team</button>
+    </div>
   </div>
-  <button class="k" id="bTheme">DARK</button>
-</header>
+  <div class="copy">© Set Forth LLC</div>
+</section>
 
-<div id="stage">
-  <div id="viewRow">
-    <button class="k" id="bView">VIEW 1</button>
-    <span id="viewHint">Tap to<br>change<br>views</span>
+<!-- ============ CREATE ============ -->
+<section class="screen" id="scCreate">
+  <div class="bar"><span class="who">Create a team</span>
+    <button class="k" id="backC">BACK</button></div>
+  <div class="pad grow">
+    <label for="cName">YOUR NAME</label>
+    <input id="cName" autocomplete="given-name" autocapitalize="words">
+    <label for="cSess">SESSION CODE</label>
+    <input id="cSess" autocapitalize="characters" autocorrect="off" spellcheck="false">
+    <div class="err" id="cErr"></div>
   </div>
-  <div id="stageInfo">Design<br><span id="mDesign">1 of 70</span><br><span id="mTier"></span></div>
-  <canvas id="cvBuild"></canvas>
-  <canvas id="cvDesign" style="display:none"></canvas>
-</div>
+  <div class="pad"><button class="big" id="cGo">SUBMIT</button></div>
+</section>
 
-<div id="builderBar">
-  <div class="seg" id="rowFree" style="width:100%">
-    <button id="tAdd" class="on" style="flex:1">ADD</button>
-    <button id="tErase2" style="flex:1">REMOVE</button>
+<!-- ============ JOIN ============ -->
+<section class="screen" id="scJoin">
+  <div class="bar"><span class="who">Join a team</span>
+    <button class="k" id="backJ">BACK</button></div>
+  <div class="pad grow">
+    <label for="jName">YOUR NAME</label>
+    <input id="jName" autocomplete="given-name" autocapitalize="words">
+    <label for="jCode">TEAM CODE</label>
+    <input id="jCode" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="4">
+    <div class="err" id="jErr"></div>
   </div>
-  <div class="seg" id="rowModes" style="width:100%; display:none">
-    <button id="tPlace" class="on" style="flex:1">STACK</button>
-    <button id="tSide" style="flex:1">SIDE</button>
-    <button id="tErase" style="flex:1">REMOVE</button>
+  <div class="pad"><button class="big" id="jGo">SUBMIT</button></div>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section class="screen" id="scLobby">
+  <div id="lobRound">ROUND 1</div>
+  <p id="lobIntro">Welcome to the lobby. Your team code is</p>
+  <div id="lobCode">----</div>
+  <div id="lobShare">Share this with your teammate.</div>
+
+  <div id="lobWait">Waiting for your teammate to join…</div>
+
+  <div id="lobPick">
+    <p>Choose your role for this round</p>
+    <div class="seg">
+      <button id="roleArch">ARCHITECT</button>
+      <button id="roleBuild">BUILDER</button>
+    </div>
   </div>
-  <div id="swatches">
-    <button id="sw-y"></button><button id="sw-b"></button>
-    <button id="sw-o"></button><button id="sw-p"></button>
+
+  <p id="lobTold"></p>
+
+  <button class="big" id="lobReady" disabled>READY?</button>
+  <div id="lobHint"></div>
+</section>
+
+<!-- ============ PLAY ============ -->
+<section class="screen" id="scPlay">
+  <div class="bar">
+    <span class="who" id="plWho"></span>
+    <span class="clock" id="plClock">0:00</span>
+    <span class="sess" id="plSess"></span>
   </div>
-  <div id="actions">
-    <button class="k" id="bCheck">CHECK</button>
-    <button class="k" id="bClear">CLEAR</button>
-    <button class="k" id="bNext">NEXT</button>
+  <div class="tools">
+    <span class="grow"></span>
+    <span class="nethint" id="netHint"></span>
+    <button class="k" id="plTheme">DARK</button>
+    <button class="k" id="plEnd">END</button>
   </div>
-  <div class="verdict" id="mVerdict"></div>
-  <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
-    <span style="color:var(--dim); font-size:calc(13px * var(--ts))">gesture</span>
-    <button class="k" id="bGesture" style="flex:1">PRESS + SLIDE</button>
-    <span style="color:var(--dim); font-size:calc(13px * var(--ts))" id="mCount">0 cubes</span>
+  <div id="stage">
+    <div class="viewRow">
+      <button class="k" id="plView">VIEW 1</button>
+      <span class="hint">Tap to<br>change<br>views</span>
+    </div>
+    <canvas id="cvPlay"></canvas>
+    <div id="plArchNote">Describe this to your teammate. They cannot see it.</div>
   </div>
-</div>
+  <div id="builderBar">
+    <div class="seg">
+      <button id="tAdd" class="on">ADD</button>
+      <button id="tErase">REMOVE</button>
+    </div>
+    <div id="swatches">
+      <button id="sw-y"></button><button id="sw-b"></button>
+      <button id="sw-o"></button><button id="sw-p"></button>
+    </div>
+    <button class="big" id="bSubmit" disabled>SUBMIT</button>
+    <div id="mCount"></div>
+  </div>
+</section>
+
+<!-- ============ DEBRIEF ============ -->
+<section class="screen" id="scDebrief">
+  <div class="bar">
+    <span class="who" id="dbWho"></span>
+    <span class="clock" id="dbClock">0:00</span>
+    <span class="sess" id="dbSess"></span>
+  </div>
+  <div class="tools">
+    <span class="grow"></span>
+    <button class="k" id="dbTheme">DARK</button>
+  </div>
+  <div id="dbDesign"><span class="pill">DESIGN</span>
+    <button class="k" id="dbView">VIEW 1</button>
+    <canvas id="cvDesRev"></canvas></div>
+  <div id="dbBuild"><span class="pill">BUILT</span><canvas id="cvBldRev"></canvas></div>
+  <div id="dbFoot">
+    <div class="verdict" id="dbVerdict"></div>
+    <div id="dbErrors"></div>
+    <div id="dbTap"></div>
+    <button class="big" id="dbGo">RETURN TO LOBBY</button>
+  </div>
+</section>
+
+<div id="modal"><div id="modBox">
+  <div id="modHead"></div>
+  <div id="modBody"></div>
+  <div id="modBtns">
+    <button class="big plain" id="modNo">NO</button>
+    <button class="big" id="modYes">YES</button>
+  </div>
+</div></div>
 
 <div id="carry"></div>
-
-<div id="fitBar">
-  <button class="tiny" id="bModel">MODEL B · free</button>
-  <span id="mModelNote"></span>
-</div>
-
-<footer>
-  <span id="mFoot"></span>
-  <span id="mWake">…</span>
-</footer>
+<div id="boom"></div>
 
 <script>
 (function(){
   "use strict";
+  var VERSION = "260909.9";
+
+  /* ---------- error surface ----------
+     Report where it happened and keep running. Silent death is what turned one
+     bug into four symptoms. */
+  var BOOM = document.getElementById("boom"), boomSeen = {};
+  function boom(where, e){
+    var k = where + "|" + (e && e.message);
+    if (!boomSeen[k]){
+      boomSeen[k] = 1;
+      var line = document.createElement("div");
+      line.textContent = where + ": " + ((e && e.message) || "no reason given");
+      if (!BOOM.querySelector("button")){
+        var b = document.createElement("button");
+        b.textContent = "dismiss";
+        b.onclick = function(){ BOOM.classList.remove("on"); };
+        BOOM.appendChild(b);
+      }
+      BOOM.appendChild(line);
+    }
+    BOOM.classList.add("on");
+  }
   /* ==========================================================
      1. GEOMETRY CONSTANTS            [verbatim from maker 260903.5]
      ========================================================== */
@@ -604,21 +752,17 @@
 
   /* ==========================================================
      MOBILE OVERRIDE — the only edit to the copied logic above.
-     A phone gets a 4x4 plate four cubes high: bigger tap targets,
-     and designs that stay legible in portrait. Section 13 below
+     A phone gets a 4x4 plate four cubes high. Section 13 below
      derives its camera distance from GRID, so this comes first.
      ========================================================== */
   GRID = 4; MAXY = 4;
 
   /* ==========================================================
-     MOBILE DESIGN SET · 70 designs, 14 families, 9 September 2026
-     Five families authored in maker 260903.5 for the phone
+     M1. THE DESIGN SET · 70 designs, 14 families
+     Five families authored for the phone in maker 260903.5
      (vine, reach, alert, slouch, perk) and nine carried over
-     from library-260906 that already fit a 4x4x4 plate. Every
-     design translated onto that plate; verdictOf normalises to
-     the minimum corner, so the move changes no scoring.
-     Ordered easy, then medium, then hard. No face marks
-     anywhere. Rule is grounded.
+     from library-260906 that fit a 4x4x4 plate. Ordered easy,
+     medium, hard. No face marks. Rule is grounded.
      ========================================================== */
   var MDESIGNS = [
     { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"E",
@@ -832,6 +976,18 @@
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"p",0],[1,0,0,"b",0],[0,0,2,"o",0],[0,1,2,"p",0],[0,2,2,"b",0],[0,1,1,"p",0],[1,1,1,"o",0],[2,1,1,"y",0],[1,1,0,"p",0],[1,2,0,"b",0]] }
   ];
+  var MLIB = MDESIGNS.map(function(d){
+    return { id:d.id, family:d.family, name:d.name, tier:d.tier,
+             glyphs:d.glyphs, faces:d.faces, rule:d.rule,
+             cubes: toCubes(d.cubes, d.fixed) || [] };
+  });
+
+  /* ---------- a stable hash, copied from relay-260908.7 ---------- */
+  function hash32(s){
+    var h = 2166136261;
+    for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
   /* ==========================================================
      11. COMPARISON AND VERDICTS
      Six verdicts in strict precedence so exactly one shows, plus
@@ -1050,6 +1206,55 @@
     }
     return true;
   }
+  /* ==========================================================
+     M2. DEALING
+     A round is one design. There is no deck and no choice: the
+     round number decides the tier, the team code decides which
+     family and which member, so two teams sitting next to each
+     other are describing different things at the same moment.
+     ========================================================== */
+  var TIERS = ["E","M","H"];
+  var TIERNAME = { E:"easy", M:"medium", H:"hard" };
+
+  /* rounds 1-3 easy, 4-7 medium, 8 and after hard */
+  function tierForRound(n){ return n <= 3 ? "E" : (n <= 7 ? "M" : "H"); }
+
+  function familiesIn(tier){
+    var out = [];
+    MLIB.forEach(function(d){ if (d.id === d.family && d.tier === tier) out.push(d.family); });
+    return out;
+  }
+  /* a stable per-team ordering of a tier's families, so no two teams work
+     them in the same order */
+  function famOrder(code, tier){
+    var fs = familiesIn(tier).slice();
+    return fs.map(function(f){ return { f:f, k:hash32(code + ":" + tier + ":" + f) }; })
+             .sort(function(a, b){ return a.k - b.k || (a.f < b.f ? -1 : 1); })
+             .map(function(x){ return x.f; });
+  }
+  /* which design this team gets for round n. used is the list of family ids
+     already dealt; once a tier is exhausted it comes round again and the
+     member is different, because the draw number has moved on. */
+  function dealFor(code, n, used){
+    var tier = tierForRound(n), order = famOrder(code, tier);
+    var fam = null, i;
+    for (i = 0; i < order.length; i++)
+      if (used.indexOf(order[i]) < 0){ fam = order[i]; break; }
+    var draw = 1;
+    if (fam === null){                       // been round once already
+      draw = 1 + Math.floor(used.filter(function(f){ return order.indexOf(f) >= 0; }).length
+                            / order.length);
+      fam = order[n % order.length];
+    }
+    var members = MLIB.filter(function(d){ return d.family === fam; });
+    var ix = hash32(code + ":" + fam + ":" + draw) % members.length;
+    return members[ix];
+  }
+  function designById(id){
+    for (var i = 0; i < MLIB.length; i++) if (MLIB[i].id === id) return MLIB[i];
+    return null;
+  }
+
   /* ==========================================================
      13. SCENE PIECES                 [adapted from maker 260903.5]
      The maker had one scene; this has several, so the scene is a
@@ -1310,288 +1515,730 @@
     ghost.add(gc);
   }
   /* ==========================================================
-     M1. THE TESTBED ITSELF
-     Everything above this line is copied out of relay-260908.7,
-     unchanged except where a comment says MOBILE. Everything below
-     is new and exists only to answer one question: does placing a
-     cube on a phone feel right?
+     M3. SHARED STATE
+     Firebase, behind read / write / subscribe, exactly as the
+     laptop game does it and for the same reasons. The two rules
+     that matter are unchanged and are why this is a copy rather
+     than a rewrite: writes go down to the leaf so two players
+     cannot overwrite each other, and null is never sent because
+     Firebase treats it as a delete.
+
+     This game lives under /m. It is a different game with a
+     different state shape, and a laptop team and a phone team
+     must never be able to join each other.
      ========================================================== */
-  var STAMP = "260909.8";
-
-  var M = {
-    ix: 0,               // which design we are looking at
-    tool: "place",       // place | side | erase
-    model: "free",       // free (B) | modes (C)
-    lastAdd: "place",
-    colour: "y",
-    build: [],
-    gesture: "press",    // press | tap
-    pane: "build",       // build | design
-    view: 0,             // ONE view for every stage on the screen
-    theme: "dark",
-    taps: 0, misfires: 0 // a rough count, shown in the footer
+  var FB_CONFIG = {
+    apiKey: "AIzaSyC-NH6Ov7sbrJN0mM54qIhRTsjl1Bj7LbQ",
+    authDomain: "relay-1b018.firebaseapp.com",
+    databaseURL: "https://relay-1b018-default-rtdb.firebaseio.com",
+    projectId: "relay-1b018",
+    storageBucket: "relay-1b018.firebasestorage.app",
+    messagingSenderId: "809917904513",
+    appId: "1:809917904513:web:201f6cef9b29a6a343ff80"
   };
+  firebase.initializeApp(FB_CONFIG);
+  var DB = firebase.database();
 
-  var DV = null, BV = null;   // design viewer, build viewer
-
-  /* MOBILE: on a phone the camera turn is information, not decoration — it is
-     the only thing that says which way the board went, and an instant cut
-     leaves the player re-reading the whole build. So a phone with Reduce
-     Motion switched on gets a shorter turn, not no turn. Section 13's own
-     skip is neutralised here rather than edited there. */
-  var MOTION_REDUCED = reduceMotion;
-  /* One speed for every phone. Two players on one team must not see the board
-     turn at different rates because one of them has an accessibility setting
-     on. Reduce Motion still shortens it; it never removes it. Two numbers. */
-  var TURN_MS = MOTION_REDUCED ? 320 : 500;
-  GLIDE_LONG = TURN_MS; GLIDE_LEG = Math.round(TURN_MS * 0.7);
-  reduceMotion = false;
-  var PLATEMATS = [];         // baseplate materials, so the palette can recolour them
-
-  /* ---------- designs, read once through the maker's reader ---------- */
-  var MLIB = MDESIGNS.map(function(d){
-    return { id:d.id, family:d.family, name:d.name, tier:d.tier,
-             glyphs:d.glyphs, faces:d.faces, rule:d.rule,
-             cubes: toCubes(d.cubes, d.fixed) || [] };
+  /* the shared clock. Two phones disagree by seconds, and every recorded
+     duration would carry that error. */
+  var TIME_OFFSET = 0;
+  DB.ref("/.info/serverTimeOffset").on("value", function(sn){
+    TIME_OFFSET = sn.val() || 0;
   });
-  function design(){ return MLIB[M.ix]; }
+  function NOW(){ return Date.now() + TIME_OFFSET; }
 
-  /* ---------- which column is under the finger ---------- */
-  /* The whole placement model: a tap names a COLUMN, never a cell. A cube
-     lands on top of that column and only the top cube of a column can be
-     taken off. There is no depth to get wrong. */
-  var mray = new THREE.Raycaster(), mndc = new THREE.Vector2();
-  function columnAt(V, cx, cy){
-    if (!V) return null;
-    var r = V.canvas.getBoundingClientRect();
-    if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null;
-    mndc.x = ((cx - r.left) / r.width) * 2 - 1;
-    mndc.y = -((cy - r.top) / r.height) * 2 + 1;
-    mray.setFromCamera(mndc, V.cam);
-    var targets = [V.plateHit], i;
-    for (i = 0; i < V.group.children.length; i++){
-      var b = V.group.children[i].userData.body;
-      if (b) targets.push(b);
+  var ONLINE = false;
+  DB.ref("/.info/connected").on("value", function(sn){
+    ONLINE = !!sn.val();
+    var h = document.getElementById("netHint");
+    if (h){
+      h.textContent = ONLINE ? "" : "reconnecting…";
+      h.className = "nethint" + (ONLINE ? "" : " off");
     }
-    var hits = mray.intersectObjects(targets, false);
-    if (!hits.length) return null;
-    var hit = hits[0], gx, gz;
-    if (hit.object === V.plateHit){
-      gx = Math.floor(hit.point.x); gz = Math.floor(hit.point.z);
-    } else {
-      var owner = hit.object.parent.userData.cube;
-      gx = owner.x; gz = owner.z;
+  });
+
+  var SESSION_CODES = ["TEST", "BELOIT"];
+  var CODE_ALPHABET = "ACDEFGHJKMNPQRTUVWXYZ";   // no O/0, I/1/L, S/5, B/8
+  function makeTeamCode(){
+    var s = "";
+    for (var i = 0; i < 4; i++)
+      s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return s;
+  }
+
+  /* ---------- the wire form ---------- */
+  /* Nothing here is ever null. Nullable numbers travel as -1, nullable
+     strings as "", a round that does not exist as { none:1 }, and anything
+     list-shaped as a JSON string. The ready flags and the submit flags are
+     separate entries on purpose: each player writes only their own, so a
+     gate that waits for both cannot be closed by whoever writes last. */
+  function blankState(){
+    return { rev:0, team:null, phase:"landing", lobby:null, round:null,
+             done:0, used:[] };
+  }
+  function J(v){ return JSON.stringify(v === undefined ? null : v); }
+  function JP(t, dflt){
+    if (t === undefined || t === null) return dflt;
+    try { var v = JSON.parse(t); return v === null ? dflt : v; }
+    catch(e){ return dflt; }
+  }
+  function nz(v){ return (v === null || v === undefined) ? -1 : v; }
+  function un(v){ return (v === undefined || v === -1) ? null : v; }
+
+  function encWire(s){
+    var w = {
+      phase: s.phase || "landing",
+      done: s.done || 0,
+      used: J(s.used || []),
+      team: J(s.team),
+      lobby: s.lobby ? {
+        hostRole: s.lobby.hostRole || "",
+        readyHost: s.lobby.readyHost ? 1 : 0,
+        readyGuest: s.lobby.readyGuest ? 1 : 0
+      } : { none: 1 },
+      round: { none: 1 }
+    };
+    if (s.round){
+      var r = s.round;
+      w.round = {
+        id: r.id, n: r.n, tier: r.tier, designId: r.designId,
+        hostRole: r.hostRole,
+        names: J(r.names),
+        startedAt: r.startedAt || 0,
+        endedAt: nz(r.endedAt),
+        elapsedMs: nz(r.elapsedMs),
+        build: J(r.build),
+        submitted: r.submitted ? 1 : 0,
+        asked: r.asked ? 1 : 0,
+        guestOk: r.guestOk ? 1 : 0,
+        endedBy: r.endedBy || ""
+      };
     }
-    if (gx < 0 || gx >= GRID || gz < 0 || gz >= GRID) return null;
-    return { x:gx, z:gz };
+    return w;
   }
-
-
-  /* ---------- what this gesture would do ---------- */
-  /* Both models are fed the same aim point. B hands the whole job to the
-     laptop's own picker; C keeps the column for stacking and uses the picker
-     only for side attachment. REMOVE is the picker in either model, because
-     any cube may be chosen, not just a column top. */
-  function mTarget(ev){
-    var a = aim(ev), pt = { clientX:a.x, clientY:a.y };
-    if (M.tool === "erase")
-      return pickIn(BV, pt, M.build, MRULE, "erase", 0, M.colour);
-    if (M.model === "free")
-      return pickIn(BV, pt, M.build, MRULE, "place", 0, M.colour);
-    if (M.tool === "side")
-      return sideOnly(M.build, pickIn(BV, pt, M.build, MRULE, "place", 0, M.colour));
-    return targetFor(M.build, "place", columnAt(BV, a.x, a.y));
-  }
-
-  /* ---------- the preview ---------- */
-  /* a pad on the baseplate under the target, so the cell is locatable even
-     when the cube itself is floating high up behind a finger */
-  function padAt(x, z, col){
-    var pad = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.94),
-      new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.38,
-                                    depthWrite:false, side:THREE.DoubleSide }));
-    pad.rotation.x = -Math.PI/2;
-    pad.position.set(x + 0.5, 0.014, z + 0.5);
-    return pad;
-  }
-  function showTarget(V, t){
-    /* the red cascade for a removal is the copied code's own work */
-    showGhostIn(V, t, M.build, MRULE,
-                M.tool === "erase" ? "erase" : "place", 0, M.colour, "none");
-    if (!t) return;
-    if (t.kind === "cell") V.ghost.add(padAt(t.x, t.z, 0x4FB6C8));
-    if (t.kind === "cube" && M.build[t.i])
-      V.ghost.add(padAt(M.build[t.i].x, M.build[t.i].z, 0xD6453F));
-  }
-
-  function commit(t){
-    if (!t){ M.misfires++; footer(); return; }
-    M.build = applyTarget(M.build, t, M.colour);
-    M.taps++;
-    paint();
-  }
-
-  /* ---------- the cube you are carrying ---------- */
-  /* Picked up from a swatch, it follows the finger until the board offers it
-     somewhere to land, at which point the 3D preview takes over and the
-     carried cube disappears — the cube has arrived. Offset above the finger,
-     because a thumb covers whatever is directly beneath it. */
-  function carryShow(colour){
-    var c = el("carry");
-    c.innerHTML = cubeSVG(colInfo(colour).hex);
-    c.style.display = "block";
-  }
-  function carryMoveTo(x, y){
-    var c = el("carry");
-    c.style.left = x + "px";
-    c.style.top  = (y - CARRY_LIFT) + "px";
-  }
-  function carryHide(){ el("carry").style.display = "none"; }
-
-  /* ---------- the gesture ---------- */
-  /* One model everywhere. Press, slide, lift. A quick tap is a zero-length
-     slide, so a confident player never notices the difference. In TAP mode
-     the commit happens on the way down instead, with no preview, which is
-     the thing we are comparing against. */
-  var G = { on:false, t:null, overStage:false, fromSwatch:false };
-
-  /* the carried cube hands over to the 3D preview the moment there is a real
-     landing place, and takes back over if the finger wanders off it */
-  function carryUpdate(){
-    if (!G.on || !G.fromSwatch){ carryHide(); return; }
-    var c = el("carry");
-    c.style.display = (G.t && G.t.kind === "cell") ? "none" : "block";
-  }
-
-  /* the point the gesture is aiming at, which is the carried cube when there
-     is one and the fingertip when there is not */
-  function aim(ev){ return aimOf(ev.clientX, ev.clientY, G.fromSwatch); }
-
-  function inStage(ev){
-    var r = BV ? BV.canvas.getBoundingClientRect() : null;
-    if (!r || !r.width) return false;
-    var a = aim(ev);
-    return a.x >= r.left && a.x <= r.right && a.y >= r.top && a.y <= r.bottom;
-  }
-
-  function gdown(ev, swatch){
-    if (swatch){
-      M.colour = swatch;
-      /* picking up a cube means you intend to put one down */
-      if (M.tool === "erase"){ M.tool = M.lastAdd; paintTool(); }
-      paintSwatches();
+  function decWire(w){
+    var s = blankState();
+    s.phase = w.phase || "landing";
+    s.done  = w.done || 0;
+    s.used  = JP(w.used, []);
+    s.team  = JP(w.team, null);
+    if (w.lobby && !w.lobby.none){
+      s.lobby = { hostRole: w.lobby.hostRole || null,
+                  readyHost: !!w.lobby.readyHost,
+                  readyGuest: !!w.lobby.readyGuest };
     }
-    if (M.pane !== "build") return;
-    if (M.gesture === "tap"){
-      G.fromSwatch = false;
-      if (!swatch) commit(mTarget(ev));
+    if (w.round && !w.round.none){
+      var r = w.round;
+      s.round = {
+        id: r.id, n: r.n || 1, tier: r.tier || "E", designId: r.designId,
+        hostRole: r.hostRole || "architect",
+        names: JP(r.names, { host:"", guest:"" }),
+        startedAt: r.startedAt || 0,
+        endedAt: un(r.endedAt),
+        elapsedMs: un(r.elapsedMs),
+        build: JP(r.build, null),
+        submitted: !!r.submitted,
+        asked: !!r.asked,
+        guestOk: !!r.guestOk,
+        endedBy: r.endedBy || null
+      };
+    }
+    return s;
+  }
+
+  function freshTeamState(code, sess, name){
+    return { rev:0,
+      team: { code:code, id:"t-" + Math.random().toString(36).slice(2, 8),
+              session:sess, host:{ name:name }, guest:null },
+      phase:"lobby",
+      lobby: { hostRole:null, readyHost:false, readyGuest:false },
+      round:null, done:0, used:[] };
+  }
+  /* ---------- leaf-level diff ---------- */
+  /* Recurse into arrays as well as objects. The deck is written as entries
+     numbered 0..n, and Firebase hands numbered entries BACK as an array — so
+     the state we compare against is not the shape we sent. Treating that array
+     as one indivisible value produced a patch that both replaced the whole
+     deck and set its individual fields, and Firebase rejects an update that
+     names a parent and its child together. Everything genuinely list-shaped in
+     the wire form travels as a JSON string, so nothing here is a real array
+     except that one, and recursing into it is exactly right. */
+  function flatten(o, prefix, out){
+    Object.keys(o).forEach(function(k){
+      var v = o[k], p = prefix ? prefix + "/" + k : k;
+      if (v && typeof v === "object") flatten(v, p, out);
+      else out[p] = v;
+    });
+    return out;
+  }
+  function diffPaths(before, after){
+    var A = flatten(before, "", {}), B = flatten(after, "", {}), patch = {};
+    Object.keys(B).forEach(function(p){ if (A[p] !== B[p]) patch[p] = B[p]; });
+    Object.keys(A).forEach(function(p){ if (!(p in B)) patch[p] = null; });
+    return patch;
+  }
+  /* Say so in words if a patch ever names a parent and its child again. The
+     bare failure is a stack trace inside the Firebase bundle, which says
+     nothing about what this code got wrong. */
+  function badPatch(patch){
+    var ks = Object.keys(patch);
+    for (var i=0;i<ks.length;i++)
+      for (var j=0;j<ks.length;j++)
+        if (i !== j && ks[j].indexOf(ks[i] + "/") === 0)
+          return "patch names both " + ks[i] + " and " + ks[j];
+    return null;
+  }
+
+  /* ---------- the store ---------- */
+  function makeStore(){
+    var s = blankState(), subs = [], ref = null, wire = null;
+    function notify(){
+      s.rev = (s.rev||0) + 1;
+      subs.slice().forEach(function(f){ try { f(s); } catch(e){ boom("subscriber", e); } });
+    }
+    return {
+      read: function(){ return s; },
+      attached: function(){ return !!ref; },
+      write: function(mut){
+        if (!ref){ mut(s); notify(); return; }          // before a team exists
+        var before = wire || encWire(s);
+        mut(s);
+        var after = encWire(s);
+        wire = after;
+        var patch = diffPaths(before, after);
+        /* SEND BEFORE PAINTING. Painting runs the subscription, and a
+           subscriber may write again — the coachmark release does exactly
+           that. If this patch went out afterwards it would carry the nested
+           write's field at its old value and undo it, which is how a repeated
+           Level 2 left one player's clock held forever. Whatever a nested
+           write changes, it changes after this has already gone. */
+        if (Object.keys(patch).length){
+          var bad = badPatch(patch);
+          if (bad){ boom("write to the server", new Error(bad)); }
+          else {
+            /* update() can throw where it stands, not just reject later, and
+               this runs from a click handler: an escaping throw abandons the
+               caller half-done, the trap brief 10 names for the paint
+               function. Report and carry on; the local state is applied. */
+            try {
+              ref.update(patch).catch(function(e){ boom("write to the server", e); });
+            } catch(e){ boom("write to the server", e); }
+          }
+        }
+        notify();
+      },
+      subscribe: function(f){
+        subs.push(f); f(s);
+        return function(){ subs = subs.filter(function(g){ return g !== f; }); };
+      },
+      /* attach to a team. ref is only set once real state has arrived, so a
+         write can never post a blank state over a live team. */
+      attach: function(code){
+        var r0 = DB.ref("m/teams/" + code + "/state");
+        r0.on("value", function(sn){
+          var w = sn.val(); if (!w) return;
+          try {
+            var next = decWire(w);
+            ref = r0; wire = w;
+            next.rev = (s.rev||0) + 1;
+            s = next;
+          } catch(e){ boom("reading state from the server", e); return; }
+          notify();
+        }, function(e){ boom("subscribing to the team", e); });
+      },
+      /* the finished round, written where it can be read later. Separate from
+         the live state on purpose: this is plain readable data for analysis,
+         not something the game reads back. */
+      saveRound: function(data){
+        if (!data || !data.round) return;
+        var key = data.round.id + "-" + ((data.team && data.team.code) || "x");
+        try {
+          DB.ref("m/rounds/" + key).set(JSON.parse(JSON.stringify(data)))
+            .catch(function(e){ boom("saving the round", e); });
+        } catch(e){ boom("saving the round", e); }
+      }
+    };
+  }
+  var SHARED = makeStore();
+
+  /* ---------- creating and joining ---------- */
+  /* Firebase's own reason, in words, plus what we were doing. A guess about
+     the wifi is worse than useless: permission_denied looks exactly like a
+     dead network from the outside, and reads as "not my problem" to the
+     person who could actually fix it. */
+  function netWhy(doing, e){
+    var m = (e && (e.message || e.code)) ? String(e.message || e.code) : "";
+    if (/permission|denied/i.test(m))
+      return "The database refused this. Its security rules need updating \u2014 " +
+             "check the Rules tab in Firebase.";
+    if (/network|offline|unavailable/i.test(m))
+      return "Could not reach the game server. Check the wifi and try again.";
+    return "Could not " + doing + ". " + (m || "No reason given.");
+  }
+  function freshTeamState(code, sess, name){
+    return { rev:0,
+      team: { code:code, id:"t-"+Math.random().toString(36).slice(2,8),
+              session:sess, host:{ name:name }, guest:null, usedRound1:[] },
+      phase:"lobby",
+      lobby: { levelId:"L1", targetMin:null, hostRole:"architect",
+               locked:false, proposal:null, rejected:false },
+      round:null, finished:[], warmup:null, pending:null };
+  }
+  /* A team code has to be unique across the room, so the claim is a
+     transaction: if someone already holds the code the write is abandoned and
+     another code is tried. */
+  function createTeam(name, sess, cb){
+    var tries = 0;
+    (function attempt(){
+      var code = makeTeamCode(), tref = DB.ref("m/teams/" + code);
+      tref.transaction(function(cur){
+        if (cur) return;                                 // taken, abandon
+        return { code:code, session:sess, build:VERSION,
+                 createdAt: firebase.database.ServerValue.TIMESTAMP,
+                 state: encWire(freshTeamState(code, sess, name)) };
+      }, function(err, committed){
+        if (err) return cb({ ok:false, why: netWhy("make a team", err) });
+        if (!committed){
+          if (++tries < 6) return attempt();
+          return cb({ ok:false, why:"Could not claim a team code. Try again." });
+        }
+        cb({ ok:true, code:code });
+      });
+    })();
+  }
+  /* Joining is two steps on purpose.
+     A transaction is the right way to claim the one free seat, but Firebase
+     runs the transaction body FIRST against whatever this browser has cached,
+     and a browser that has never seen this team has cached nothing. It would
+     conclude the team does not exist and abandon the attempt, which is final —
+     it never asks the server. So read the team once, which both gives us real
+     error messages and primes the cache, and only then claim the seat. */
+  function joinTeam(code, name, cb){
+    if (!/^[A-Z]{4}$/.test(code))
+      return cb({ ok:false, why:"A team code is four letters. Ask your teammate to read it out again." });
+    var tref = DB.ref("m/teams/" + code);
+    tref.once("value").then(function(sn){
+      var cur = sn.val();
+      if (!cur || !cur.state)
+        return cb({ ok:false, why:"No team with that code. Ask your teammate to read it out again." });
+      if (cur.build && cur.build !== VERSION)
+        return cb({ ok:false, why:"Your teammate is on Relay " + cur.build + " and you are on " +
+                    VERSION + ". You both need the same file." });
+      var team = JP(cur.state.team, null);
+      if (!team)
+        return cb({ ok:false, why:"That team looks broken. Ask your teammate to create a new one." });
+      if (team.guest)
+        return cb({ ok:false, why:"That team already has two players." });
+
+      /* Now claim the seat. Firebase runs this the first time against the
+         local cache, and once() does not leave anything cached — only a live
+         listener does — so that first run sees nothing at all. Returning
+         nothing would abandon the attempt for good, so instead we answer from
+         the copy we just read. Firebase then checks the server, finds its copy
+         differs from the empty one we were guessing against, and runs this
+         again with the real team; that second run is the one that decides.
+         Abandoning is therefore only ever a genuine "someone beat us to it". */
+      var taken = false;
+      tref.child("state/team").transaction(function(cur2){
+        taken = false;
+        var t2 = JP(cur2, null);
+        if (!t2){
+          var seed = JP(J(team), null);      // the team as the server had it
+          seed.guest = { name:name };
+          return J(seed);
+        }
+        if (t2.guest){ taken = true; return; }
+        t2.guest = { name:name };
+        return J(t2);
+      }, function(err, committed){
+        if (err) return cb({ ok:false, why: netWhy("join that team", err) });
+        if (!committed)
+          return cb({ ok:false, why: taken ? "That team already has two players."
+                                           : "Could not join that team. Try again." });
+        cb({ ok:true, code:code });
+      });
+    }).catch(function(e){
+      cb({ ok:false, why: netWhy("look that team up", e) });
+    });
+  }
+
+  /* ---------- remembering a seat ----------
+     A refresh loses everything this tab knew, and typing the code again is
+     refused because the seat is still held. So the seat is remembered locally
+     and offered back as a button on the landing screen. Nothing here is
+     shared: it is this browser's note of who it was. */
+  function seatKey(slot){ return "relay.m.seat." + slot; }
+  function saveSeat(slot, code, kind, name){
+    try { localStorage.setItem(seatKey(slot),
+      JSON.stringify({ code:code, kind:kind, name:name, at:Date.now() })); } catch(e){}
+  }
+  function loadSeat(slot){
+    try { return JSON.parse(localStorage.getItem(seatKey(slot)) || "null"); }
+    catch(e){ return null; }
+  }
+  function clearSeat(slot){ try { localStorage.removeItem(seatKey(slot)); } catch(e){} }
+
+  /* ==========================================================
+     M4. THE GAME
+     Six screens: landing, create, join, lobby, play, debrief.
+     Landing, create and join are local to this phone; from the
+     lobby on, the shared phase decides what is on screen.
+
+     One rule runs through all of it: THE HOST MAKES THE MOVES.
+     Both players write their own flags, but only the host deals
+     a round or ends one. Two phones both noticing "we are both
+     ready" at the same moment would otherwise deal two different
+     designs, and the second would win by arriving last.
+     ========================================================== */
+  var ME = null;            // "host" or "guest", decided when we take a seat
+  var SESS = "";
+  var UI = { screen:"landing", msg:"", busy:false, tapNote:"" };
+  var DV = null, BV = null, RD = null, RB = null;   // play, and the two debrief stages
+
+  function S(){ return SHARED.read(); }
+  function myName(){
+    var t = S().team; if (!t) return "";
+    return ME === "host" ? (t.host && t.host.name) : (t.guest && t.guest.name);
+  }
+  function myRole(){
+    var r = S().round; if (!r) return null;
+    return ME === "host" ? r.hostRole : (r.hostRole === "architect" ? "builder" : "architect");
+  }
+  function amArchitect(){ return myRole() === "architect"; }
+
+  /* ---------- moving between screens ---------- */
+  function show(id){
+    ["scLanding","scCreate","scJoin","scLobby","scPlay","scDebrief"].forEach(function(s){
+      var e = el(s); if (e) e.style.display = (s === id) ? "flex" : "none";
+    });
+    UI.screen = id;
+  }
+  function screenFor(){
+    var s = S();
+    if (!s.team) return UI.screen === "scCreate" || UI.screen === "scJoin"
+                       ? UI.screen : "scLanding";
+    if (s.phase === "debrief") return "scDebrief";
+    if (s.phase === "play")    return "scPlay";
+    return "scLobby";
+  }
+
+  /* ---------- the clock ---------- */
+  function mmss(ms){
+    var t = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2);
+  }
+  function roundMs(){
+    var r = S().round; if (!r) return 0;
+    if (r.elapsedMs !== null && r.elapsedMs !== undefined) return r.elapsedMs;
+    return NOW() - (r.startedAt || NOW());
+  }
+
+  /* ---------- the lobby ---------- */
+  function pickRole(role){
+    if (ME !== "host") return;
+    SHARED.write(function(st){
+      if (!st.lobby) st.lobby = { hostRole:null, readyHost:false, readyGuest:false };
+      st.lobby.hostRole = role;
+    });
+  }
+  function pressReady(){
+    var s = S();
+    if (!s.lobby || !s.lobby.hostRole) return;
+    if (ME === "host" && s.lobby.readyHost) return;
+    if (ME === "guest" && s.lobby.readyGuest) return;
+    /* the wake lock is taken here, and this is the only chance. The Architect
+       touches nothing for the whole round, and iOS will not grant a lock
+       without a gesture — so it has to be this one. */
+    keepAwake();
+    SHARED.write(function(st){
+      if (ME === "host") st.lobby.readyHost = true; else st.lobby.readyGuest = true;
+    });
+    maybeStart();
+  }
+  /* only the host deals */
+  function maybeStart(){
+    if (ME !== "host") return;
+    var s = S();
+    if (s.phase !== "lobby" || s.round) return;
+    if (!s.lobby || !s.lobby.readyHost || !s.lobby.readyGuest) return;
+    var n = (s.done || 0) + 1;
+    var d = dealFor(s.team.code, n, s.used || []);
+    var t = s.team;
+    SHARED.write(function(st){
+      st.round = {
+        id: "r-" + NOW().toString(36),
+        n: n, tier: d.tier, designId: d.id,
+        hostRole: st.lobby.hostRole,
+        names: { host: t.host.name, guest: (t.guest && t.guest.name) || "" },
+        startedAt: NOW(), endedAt: null, elapsedMs: null,
+        build: null, submitted: false, asked: false, guestOk: false, endedBy: null
+      };
+      st.used = (st.used || []).concat([d.family]);
+      st.phase = "play";
+    });
+  }
+
+  /* ---------- playing ---------- */
+  var BUILD = [];                       // this phone's working build
+  function pushBuild(){
+    if (amArchitect()) return;
+    SHARED.write(function(st){ if (st.round) st.round.build = BUILD.slice(); });
+  }
+  function submit(){
+    if (amArchitect()) return;
+    var s = S(); if (!s.round || s.round.submitted) return;
+    SHARED.write(function(st){
+      st.round.build = BUILD.slice();
+      st.round.submitted = true;
+    });
+  }
+  /* the Architect is asked to confirm, blind. Saying no puts the Builder back
+     to work rather than leaving them stuck on WAITING. */
+  function confirmSubmit(yes){
+    if (!amArchitect()) return;
+    if (!yes){
+      SHARED.write(function(st){ if (st.round) st.round.submitted = false; });
       return;
     }
-    G.on = true;
-    G.fromSwatch = !!swatch;              // set before any aim is taken
-    G.overStage = inStage(ev);
-    G.t = mTarget(ev);
-    showTarget(BV, G.t);
-    if (G.fromSwatch){ carryShow(M.colour); carryMoveTo(ev.clientX, ev.clientY); }
-    carryUpdate();
+    endRound("architect");
   }
-  function gmove(ev){
-    if (!G.on) return;
-    if (inStage(ev)) G.overStage = true;
-    G.t = mTarget(ev);
-    showTarget(BV, G.t);
-    if (G.fromSwatch) carryMoveTo(ev.clientX, ev.clientY);
-    carryUpdate();
-  }
-  function gup(){
-    if (!G.on) return;
-    G.on = false;
-    var t = G.t, over = G.overStage;
-    G.t = null; G.overStage = false; G.fromSwatch = false;
-    showTarget(BV, null); carryHide();
-    /* lifting off without ever reaching the baseplate is a cancel, not a miss */
-    if (!t && !over) return;
-    commit(t);
+  function endRound(by){
+    var s = S(); if (!s.round || s.phase !== "play") return;
+    var ms = NOW() - (s.round.startedAt || NOW());
+    SHARED.write(function(st){
+      st.round.endedAt = NOW();
+      st.round.elapsedMs = ms;
+      st.round.endedBy = by;
+      st.phase = "debrief";
+    });
+    if (ME === "host") saveRound();
   }
 
-  /* ---------- painting ---------- */
-  function paint(){
-    if (BV) BV.paint(M.build, "none", {});
-    if (DV) DV.paint(design().cubes, "none", {});
-    el("mDesign").textContent = (M.ix + 1) + " of " + MLIB.length;
-    el("mTier").textContent = ({E:"easy",M:"medium",H:"hard"})[design().tier] || design().tier;
-    el("mCount").textContent = M.build.length + (M.build.length === 1 ? " cube" : " cubes");
-    el("mVerdict").textContent = "";
-    el("mVerdict").className = "verdict";
-    footer();
+  /* ---------- the debrief ---------- */
+  function askReturn(){
+    if (ME !== "host") return;
+    SHARED.write(function(st){ if (st.round) st.round.asked = true; });
   }
-  function paintSwatches(){
-    CKEYS.forEach(function(k){
-      var b = el("sw-" + k);
-      b.classList.toggle("on", k === M.colour);
-      b.classList.toggle("off", M.tool === "erase");
-    });
-  }
-  function paintTool(){
-    ["tPlace","tSide","tErase","tAdd","tErase2"].forEach(function(id){
-      var b = el(id); if (b) b.classList.toggle("on", false);
-    });
-    if (M.model === "free"){
-      el("tAdd").classList.toggle("on", M.tool !== "erase");
-      el("tErase2").classList.toggle("on", M.tool === "erase");
-    } else {
-      el("tPlace").classList.toggle("on", M.tool === "place");
-      el("tSide").classList.toggle("on", M.tool === "side");
-      el("tErase").classList.toggle("on", M.tool === "erase");
+  function answerReturn(yes){
+    if (ME !== "guest") return;
+    if (!yes){
+      SHARED.write(function(st){ if (st.round) st.round.asked = false; });
+      return;
     }
-    if (M.tool !== "erase") M.lastAdd = M.tool;
-    paintSwatches();
+    SHARED.write(function(st){ if (st.round) st.round.guestOk = true; });
   }
-  function paintModel(){
-    el("rowFree").style.display  = M.model === "free"  ? "flex" : "none";
-    el("rowModes").style.display = M.model === "modes" ? "flex" : "none";
-    el("bModel").textContent = M.model === "free" ? "MODEL B · free" : "MODEL C · stack+side";
-    el("mModelNote").textContent = M.model === "free"
-      ? "aim at any face" : "STACK aims a column · SIDE aims a side face";
-  }
-  function paintPane(){
-    el("paneBuild").classList.toggle("on", M.pane === "build");
-    el("paneDesign").classList.toggle("on", M.pane === "design");
-    el("cvBuild").style.display  = M.pane === "build"  ? "block" : "none";
-    el("cvDesign").style.display = M.pane === "design" ? "block" : "none";
-    el("builderBar").style.visibility = M.pane === "build" ? "visible" : "hidden";
-  }
-  function footer(){
-    el("mFoot").textContent =
-      GRID + "x" + GRID + "x" + MAXY +
-      " · " + M.taps + " placed · " + M.misfires + " missed" +
-      " · " + MRULE +
-      " · motion " + (MOTION_REDUCED ? "reduced" : "full") +
-      " · " + STAMP;
+  /* again, only the host actually moves the team */
+  function maybeReturn(){
+    if (ME !== "host") return;
+    var s = S();
+    if (s.phase !== "debrief" || !s.round || !s.round.asked || !s.round.guestOk) return;
+    SHARED.write(function(st){
+      st.done = (st.done || 0) + 1;
+      st.round = null;
+      st.phase = "lobby";
+      st.lobby = { hostRole: st.lobby ? st.lobby.hostRole : null,
+                   readyHost:false, readyGuest:false };
+    });
   }
 
-  /* ---------- how much of the canvas the build fills ---------- */
-  /* Section 13 frames the scene for a laptop, where there is room to spare. A
-     phone has none, so the camera comes in closer and looks a little above the
-     plate, which pushes the build down the canvas and lets it be bigger. Both
-     numbers are live in the testbed so they can be settled on a real screen
-     instead of estimated from here; the winning pair gets baked into the game
-     and the control disappears. */
-  var ORBIT0 = ORBIT, LIFT0 = LIFT, CY0 = CENTRE.y;
-  var FIT = { zoom:0.92, drop:0.55 };   // settled on two phones, 9 Sep
-  function refit(){
-    FIT.zoom = Math.max(0.68, Math.min(1.25, FIT.zoom));
-    FIT.drop = Math.max(-0.60, Math.min(1.80, FIT.drop));
-    ORBIT = ORBIT0 * FIT.zoom;
-    LIFT  = LIFT0  * FIT.zoom;
-    CENTRE.y = CY0 + FIT.drop;
-    VIEWERS.forEach(function(V){ V.snapTo(M.view); });
-    if (window.RELAY_M){ window.RELAY_M.fitZoom = FIT.zoom; window.RELAY_M.fitDrop = FIT.drop; }
+  /* ---------- the record ---------- */
+  /* Written once, by the host, for the facilitator to read afterwards. The
+     game never reads it back. */
+  function saveRound(){
+    var s = S(), r = s.round; if (!r) return;
+    var d = designById(r.designId); if (!d) return;
+    var b = r.build || [];
+    var v = verdictOf(d, b), df = diffOf(d, b);
+    SHARED.saveRound({
+      app:"relay-m", build:VERSION, session:s.team.session,
+      team:{ id:s.team.id, code:s.team.code,
+             players:{ host:r.names.host, guest:r.names.guest } },
+      round:{ id:r.id, n:r.n, tier:r.tier, designId:r.designId,
+              hostRole:r.hostRole, startedAt:r.startedAt, endedAt:r.endedAt,
+              elapsedMs:r.elapsedMs, endedBy:r.endedBy },
+      result:{ verdict:v, submitted:!!r.submitted, cubes:b.length,
+               designCubes:d.cubes.length,
+               extra:df.extra, missing:df.missing, color:df.color,
+               wrong: df.extra + df.missing + df.color }
+    });
   }
 
-  /* ---------- a swatch is a cube, not a square ---------- */
-  /* Three faces of one colour, so the control looks like the thing it puts on
-     the board. Lit the same way as the scene: top brightest, right darkest. */
+  /* ==========================================================
+     M5. PAINTING
+     One function. It runs on every state change and on every
+     tick of the clock, and it must never write to the state
+     layer — brief §10, the trap that cost Session 2 a day.
+     ========================================================== */
+  var lastScreen = "", lastDesign = "", lastBuildSig = "";
+
+  function paint(){
+    var s = S(), want = screenFor();
+    if (want !== lastScreen){ show(want); lastScreen = want; }
+
+    if (want === "scLanding") return paintLanding();
+    if (want === "scCreate" || want === "scJoin") return;
+    if (want === "scLobby")  return paintLobby();
+    if (want === "scPlay")   return paintPlay();
+    if (want === "scDebrief")return paintDebrief();
+  }
+
+  function paintLanding(){
+    var seat = loadSeat("m");
+    var box = el("resume");
+    if (seat && seat.code){
+      box.style.display = "block";
+      el("resumeBtn").textContent = "REJOIN TEAM " + seat.code;
+      el("resumeWho").textContent = seat.name + " · " + seat.kind;
+    } else box.style.display = "none";
+  }
+
+  function paintLobby(){
+    var s = S(), lob = s.lobby || {};
+    el("lobCode").textContent = s.team.code;
+    el("lobIntro").textContent = ME === "host"
+      ? "Welcome to the lobby. Your team code is"
+      : "Welcome to the lobby. Your team code is";
+    el("lobShare").style.display = ME === "host" ? "block" : "none";
+    el("lobRound").textContent = "Round " + ((s.done || 0) + 1);
+
+    var waiting = !s.team.guest;
+    el("lobWait").style.display = waiting ? "block" : "none";
+    el("lobPick").style.display = (!waiting && ME === "host") ? "block" : "none";
+    el("lobTold").style.display = (!waiting && ME === "guest") ? "block" : "none";
+
+    if (ME === "host"){
+      el("roleArch").classList.toggle("on", lob.hostRole === "architect");
+      el("roleBuild").classList.toggle("on", lob.hostRole === "builder");
+    } else {
+      el("lobTold").textContent = lob.hostRole
+        ? "You're going to play as " +
+          (lob.hostRole === "architect" ? "BUILDER" : "ARCHITECT") + " for this round."
+        : "Waiting for your teammate to choose roles…";
+    }
+
+    var mine = ME === "host" ? lob.readyHost : lob.readyGuest;
+    var can = !waiting && !!lob.hostRole;
+    var b = el("lobReady");
+    b.disabled = !can || mine;
+    b.textContent = mine ? "WAITING …" : "READY?";
+    el("lobHint").textContent = !s.team.guest
+      ? "" : (mine ? "" : (can ? "" : "Waiting for your teammate to choose roles…"));
+  }
+
+  function header(pfx){
+    var s = S(), r = s.round;
+    el(pfx + "Who").textContent =
+      r.names.host + " + " + r.names.guest + "  |  Round " + r.n + " – " +
+      (myRole() === "architect" ? "Architect" : "Builder");
+    el(pfx + "Sess").textContent = "Session: " + s.team.session;
+  }
+
+  function paintPlay(){
+    var s = S(), r = s.round, d = designById(r.designId);
+    header("pl");
+    el("plClock").textContent = mmss(roundMs());
+
+    var arch = amArchitect();
+    el("builderBar").style.display = arch ? "none" : "block";
+    el("plArchNote").style.display = arch ? "block" : "none";
+
+    if (arch){
+      if (lastDesign !== r.designId){ BV.paint(d.cubes, "none", {}); lastDesign = r.designId; }
+      /* the confirmation, blind: the Architect never sees the build */
+      modal(r.submitted ? {
+        head: r.names[r.hostRole === "architect" ? "guest" : "host"] + " says the build is done.",
+        body: "Lock it in and see how you did?",
+        yes: "YES", no: "NO",
+        onYes: function(){ confirmSubmit(true); },
+        onNo:  function(){ confirmSubmit(false); }
+      } : null);
+    } else {
+      var sig = JSON.stringify(BUILD);
+      if (sig !== lastBuildSig){ BV.paint(BUILD, "none", {}); lastBuildSig = sig; }
+      var sb = el("bSubmit");
+      sb.disabled = !BUILD.length || r.submitted;
+      sb.textContent = r.submitted ? "WAITING …" : "SUBMIT";
+      modal(null);
+    }
+    el("mCount").textContent = arch ? "" :
+      BUILD.length + (BUILD.length === 1 ? " cube" : " cubes");
+  }
+
+  function paintDebrief(){
+    var s = S(), r = s.round, d = designById(r.designId);
+    var b = r.build || [];
+    header("db");
+    el("dbClock").textContent = mmss(roundMs());
+
+    var v = verdictOf(d, b), df = diffOf(d, b);
+    var flags = {}, styles = {};
+    Object.keys(df.build).forEach(function(k){
+      flags[k] = "extra";
+      if (Number(k) !== TAPPED) styles[k] = "zebra";
+    });
+    RD.paint(d.cubes, "none", {});
+    RB.paint(b, "none", { flags:flags, styles:styles, ghosts:df.ghosts,
+                          weight:3, ghostOpacity:0.40 });
+
+    var wrong = df.extra + df.missing + df.color;
+    el("dbVerdict").textContent = v;
+    el("dbVerdict").className = "verdict " + (v === "PERFECT" ? "good" : "bad");
+    el("dbErrors").textContent = wrong === 0
+      ? "ERRORS: None. Perfect build"
+      : "ERRORS: " + wrong + "  ·  " + diffWords(df);
+    el("dbTap").textContent = UI.tapNote;
+
+    if (ME === "host"){
+      var hb = el("dbGo");
+      hb.style.display = "block";
+      hb.disabled = !!r.asked;
+      hb.textContent = r.asked ? "WAITING …" : "RETURN TO LOBBY";
+      modal(null);
+    } else {
+      el("dbGo").style.display = "none";
+      modal(r.asked ? {
+        head: "Return to lobby?",
+        body: "Your teammate is ready for the next round.",
+        yes: "YES", no: "NO",
+        onYes: function(){ answerReturn(true); },
+        onNo:  function(){ answerReturn(false); }
+      } : null);
+    }
+  }
+
+  /* which cube the debrief has been asked about */
+  var TAPPED = -1;
+  var WHYWORDS = { extra:"This cube should not be here.",
+                   color:"Right place, wrong color.",
+                   facing:"Right place, wrong way up." };
+
+  /* ---------- the modal ---------- */
+  var MODAL = null;
+  function modal(spec){
+    var box = el("modal");
+    var same = (!spec && !MODAL) ||
+               (spec && MODAL && spec.head === MODAL.head && spec.body === MODAL.body);
+    MODAL = spec;
+    if (!spec){ box.style.display = "none"; return; }
+    if (!same){
+      el("modHead").textContent = spec.head;
+      el("modBody").textContent = spec.body;
+      el("modYes").textContent = spec.yes;
+      el("modNo").textContent = spec.no;
+    }
+    box.style.display = "flex";
+  }
+  /* ==========================================================
+     M6. INPUT AND BOOT
+     The gesture is the one settled in the testbed: press, slide,
+     lift, with the laptop's own picker deciding the cell and a
+     ghost showing it before you commit. A cube carried up from a
+     swatch is aimed by the CUBE, not the fingertip.
+     ========================================================== */
+  function el(id){ return document.getElementById(id); }
+  function on(id, fn){ var e = el(id); if (e) e.addEventListener("click", fn); }
+
+  /* ---------- the palette on screen ---------- */
   function shade(hex, amt){
     var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16),
         b = parseInt(hex.slice(5,7),16);
@@ -1615,97 +2262,255 @@
       '</svg>';
   }
 
-  /* ---------- the view every stage shares ---------- */
-  /* 260909.7 gave each viewer its own view index and stepped only the one on
-     screen. Switching panes then left the button showing the other stage's
-     number and the two stages pointing different ways, which makes copying a
-     design from memory impossible. There is one view on a screen, not one per
-     canvas — and that is also what the debrief needs, where the design and the
-     build sit side by side and must be seen from the same angle. */
-  function setView(i){
-    M.view = ((i % 4) + 4) % 4;
-    VIEWERS.forEach(function(V){ V.stepTo(M.view); });
-    var b = el("bView");
-    if (b) b.textContent = "VIEW " + (M.view + 1);
+  var COLOUR = "y", TOOL = "place";
+  function paintSwatches(){
+    CKEYS.forEach(function(k){
+      var b = el("sw-" + k); if (!b) return;
+      b.classList.toggle("on", k === COLOUR);
+      b.classList.toggle("off", TOOL === "erase");
+    });
+    var a = el("tAdd"), e = el("tErase");
+    if (a) a.classList.toggle("on", TOOL === "place");
+    if (e) e.classList.toggle("on", TOOL === "erase");
   }
 
-  /* ---------- the palette ---------- */
+  /* ---------- the framing, settled on two phones ---------- */
   var PLATE = { line:0x5B7288, edge:0x74C6D8 };
-  function theme(next){
-    M.theme = next;
-    document.documentElement.setAttribute("data-theme", next);
-    var line = next === "light" ? 0x9AAAB8 : 0x5B7288;
-    var edge = next === "light" ? 0x2C7F90 : 0x74C6D8;
-    PLATE.line = line; PLATE.edge = edge;
-    PLATEMATS.forEach(function(p){ p.line.color.setHex(line); p.edge.color.setHex(edge); });
-    el("bTheme").textContent = next === "light" ? "DARK" : "LIGHT";
+  var PLATEMATS = [];
+  var ORBIT0 = ORBIT, LIFT0 = LIFT, CY0 = CENTRE.y;
+  var FIT = { zoom:0.92, drop:0.55 };
+  var VIEW = 0;
+  function refit(){
+    ORBIT = ORBIT0 * FIT.zoom; LIFT = LIFT0 * FIT.zoom;
+    CENTRE.y = CY0 + FIT.drop;
+    VIEWERS.forEach(function(V){ V.snapTo(VIEW); });
   }
-
-  /* ---------- keeping the screen awake ---------- */
-  /* The Architect will hold a phone for two minutes without touching it. */
-  var wake = null;
-  function keepAwake(){
-    if (!("wakeLock" in navigator)){
-      el("mWake").textContent = "no wake lock api"; return;
-    }
-    /* the API is refused outright off HTTPS, which is what a file opened from
-       Mail or Files is. Say that rather than "refused", which sends the next
-       hour in the wrong direction. Brief §11. */
-    if (window.isSecureContext === false){
-      el("mWake").textContent = "wake lock needs https"; return;
-    }
-    navigator.wakeLock.request("screen").then(function(w){
-      wake = w; el("mWake").textContent = "awake";
-      w.addEventListener("release", function(){
-        wake = null; el("mWake").textContent = "released";
-      });
-    }).catch(function(e){
-      /* the browser's own words, not a guess at what they mean */
-      el("mWake").textContent = "wake: " + (e && (e.name || e.message) || "refused");
+  /* one view for every stage on the screen. Two stages facing different ways
+     makes the debrief's comparison meaningless. */
+  function setView(i){
+    VIEW = ((i % 4) + 4) % 4;
+    VIEWERS.forEach(function(V){ V.stepTo(VIEW); });
+    ["plView","dbView"].forEach(function(id){
+      var b = el(id); if (b) b.textContent = "VIEW " + (VIEW + 1);
     });
   }
-  function keepAwakeOnGesture(){
-    if (!wake) keepAwake();
+
+  var MOTION_REDUCED = reduceMotion;
+  var TURN_MS = MOTION_REDUCED ? 320 : 500;
+  GLIDE_LONG = TURN_MS; GLIDE_LEG = Math.round(TURN_MS * 0.7);
+  reduceMotion = false;
+
+  function theme(next){
+    THEME = next;
+    document.documentElement.setAttribute("data-theme", next);
+    PLATE.line = next === "light" ? 0x9AAAB8 : 0x5B7288;
+    PLATE.edge = next === "light" ? 0x2C7F90 : 0x74C6D8;
+    PLATEMATS.forEach(function(p){
+      p.line.color.setHex(PLATE.line); p.edge.color.setHex(PLATE.edge);
+    });
+    ["plTheme","dbTheme"].forEach(function(id){
+      var b = el(id); if (b) b.textContent = next === "light" ? "DARK" : "LIGHT";
+    });
+    try { localStorage.setItem("relay.m.theme", next); } catch(e){}
+  }
+  var THEME = "light";
+
+  /* ---------- keeping the screen awake ---------- */
+  /* Taken at the READY press, because that is the last gesture the Architect
+     makes before two minutes of talking, and iOS will not grant a lock
+     without one. */
+  var wake = null;
+  function keepAwake(){
+    if (!("wakeLock" in navigator)) return;
+    try {
+      navigator.wakeLock.request("screen").then(function(w){
+        wake = w;
+        w.addEventListener("release", function(){ wake = null; });
+      }).catch(function(){});
+    } catch(e){}
   }
   document.addEventListener("visibilitychange", function(){
-    if (document.visibilityState === "visible") keepAwake();
+    if (document.visibilityState === "visible" && !wake && S().round) keepAwake();
   });
 
-  /* ---------- wiring ---------- */
-  function el(id){ return document.getElementById(id); }
-  function on(id, fn){ el(id).addEventListener("click", fn); }
+  /* ---------- the gesture ---------- */
+  var G = { on:false, t:null, overStage:false, fromSwatch:false };
+  function aim(ev){ return aimOf(ev.clientX, ev.clientY, G.fromSwatch); }
+  function inStage(ev){
+    var r = BV ? BV.canvas.getBoundingClientRect() : null;
+    if (!r || !r.width) return false;
+    var a = aim(ev);
+    return a.x >= r.left && a.x <= r.right && a.y >= r.top && a.y <= r.bottom;
+  }
+  function mTarget(ev){
+    var a = aim(ev), pt = { clientX:a.x, clientY:a.y };
+    return pickIn(BV, pt, BUILD, MRULE, TOOL === "erase" ? "erase" : "place", 0, COLOUR);
+  }
+  function padAt(x, z, col){
+    var pad = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.94),
+      new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.38,
+                                    depthWrite:false, side:THREE.DoubleSide }));
+    pad.rotation.x = -Math.PI/2;
+    pad.position.set(x + 0.5, 0.014, z + 0.5);
+    return pad;
+  }
+  function showTarget(t){
+    if (!BV) return;
+    showGhostIn(BV, t, BUILD, MRULE, TOOL === "erase" ? "erase" : "place", 0, COLOUR, "none");
+    if (!t) return;
+    if (t.kind === "cell") BV.ghost.add(padAt(t.x, t.z, 0x4FB6C8));
+    if (t.kind === "cube" && BUILD[t.i])
+      BV.ghost.add(padAt(BUILD[t.i].x, BUILD[t.i].z, 0xD6453F));
+  }
+  var CARRY_ON = false;
+  function carryShow(c){ var e = el("carry"); e.innerHTML = cubeSVG(colInfo(c).hex);
+                         e.style.display = "block"; CARRY_ON = true; }
+  function carryTo(x, y){ var e = el("carry");
+                          e.style.left = x + "px"; e.style.top = (y - CARRY_LIFT) + "px"; }
+  function carryHide(){ el("carry").style.display = "none"; CARRY_ON = false; }
+  function carryUpdate(){
+    if (!G.on || !G.fromSwatch){ if (CARRY_ON) carryHide(); return; }
+    el("carry").style.display = (G.t && G.t.kind === "cell") ? "none" : "block";
+  }
 
+  function commit(t){
+    if (!t || t.kind === "empty") return;
+    BUILD = applyTarget(BUILD, t, COLOUR);
+    pushBuild();                        // so a reload does not lose the build
+    paint();
+  }
+  function gdown(ev, swatch){
+    if (S().phase !== "play" || amArchitect()) return;
+    if (S().round && S().round.submitted) return;
+    if (swatch){
+      COLOUR = swatch;
+      if (TOOL === "erase"){ TOOL = "place"; }
+      paintSwatches();
+    }
+    G.on = true; G.fromSwatch = !!swatch; G.overStage = inStage(ev);
+    G.t = mTarget(ev); showTarget(G.t);
+    if (G.fromSwatch){ carryShow(COLOUR); carryTo(ev.clientX, ev.clientY); }
+    carryUpdate();
+  }
+  function gmove(ev){
+    if (!G.on) return;
+    if (inStage(ev)) G.overStage = true;
+    G.t = mTarget(ev); showTarget(G.t);
+    if (G.fromSwatch) carryTo(ev.clientX, ev.clientY);
+    carryUpdate();
+  }
+  function gup(){
+    if (!G.on) return;
+    G.on = false;
+    var t = G.t, over = G.overStage;
+    G.t = null; G.overStage = false; G.fromSwatch = false;
+    showTarget(null); carryHide();
+    if (!t && !over) return;
+    commit(t);
+  }
+
+  /* ---------- tapping a flagged cube in the debrief ---------- */
+  function tapDebrief(ev){
+    var s = S(); if (s.phase !== "debrief" || !RB) return;
+    var r = s.round, d = designById(r.designId), b = r.build || [];
+    var p = pickIn(RB, ev, b, MRULE, "erase", 0, "y");
+    var df = diffOf(d, b);
+    if (p && p.kind === "cube" && df.build[p.i] !== undefined){
+      TAPPED = p.i;
+      UI.tapNote = WHYWORDS[df.build[p.i]] || "This cube does not match.";
+    } else { TAPPED = -1; UI.tapNote = ""; }
+    paint();
+  }
+
+  /* ---------- taking a seat ---------- */
+  function takeSeat(kind, code, name){
+    ME = kind; SESS = "";
+    saveSeat("m", code, kind, name);
+    SHARED.attach(code);
+  }
+  function doCreate(){
+    if (UI.busy) return;
+    var name = (el("cName").value || "").trim();
+    var sess = (el("cSess").value || "").trim().toUpperCase();
+    if (!name)  return say("cErr", "Put your name in first.");
+    if (SESSION_CODES.indexOf(sess) < 0)
+      return say("cErr", "That session code is not one we know. Check it with the facilitator.");
+    UI.busy = true; say("cErr", "Making a team…");
+    createTeam(name, sess, function(res){
+      UI.busy = false;
+      if (!res.ok) return say("cErr", res.why);
+      say("cErr", "");
+      takeSeat("host", res.code, name);
+    });
+  }
+  function doJoin(){
+    if (UI.busy) return;
+    var name = (el("jName").value || "").trim();
+    var code = (el("jCode").value || "").trim().toUpperCase();
+    if (!name) return say("jErr", "Put your name in first.");
+    UI.busy = true; say("jErr", "Looking for that team…");
+    joinTeam(code, name, function(res){
+      UI.busy = false;
+      if (!res.ok) return say("jErr", res.why);
+      say("jErr", "");
+      takeSeat("guest", res.code, name);
+    });
+  }
+  function say(id, t){ var e = el(id); if (e) e.textContent = t; }
+
+  /* ---------- reacting to the state, then painting ---------- */
+  /* Anything that changes local state lives here. paint() only reads. */
+  function onState(){
+    var s = S(), r = s.round;
+    if (!r){ BUILD = []; lastBuildSig = ""; lastDesign = ""; TAPPED = -1; UI.tapNote = ""; }
+    else if (!amArchitect() && !BUILD.length && r.build && r.build.length)
+      BUILD = r.build.slice();            // a reload, or this phone rejoining
+    maybeStart();
+    maybeReturn();
+  }
+
+  /* ---------- boot ---------- */
   function boot(){
-    DV = makeViewer(el("cvDesign"), { fov:46 });
-    BV = makeViewer(el("cvBuild"),  { fov:46 });
+    try { THEME = localStorage.getItem("relay.m.theme") || "light"; } catch(e){}
 
-    /* the four presets, stepped one button at a time */
-    on("bView", function(){ setView(M.view + 1); });
+    BV = makeViewer(el("cvPlay"),  { fov:46 });
+    RD = makeViewer(el("cvDesRev"), { fov:46 });
+    RB = makeViewer(el("cvBldRev"), { fov:46 });
 
-    on("paneBuild",  function(){ M.pane = "build";  paintPane(); });
-    on("paneDesign", function(){ M.pane = "design"; paintPane(); });
-    on("tPlace",  function(){ M.tool = "place"; paintTool(); });
-    on("tSide",   function(){ M.tool = "side";  paintTool(); });
-    on("tErase",  function(){ M.tool = "erase"; paintTool(); });
-    on("tAdd",    function(){ M.tool = "place"; paintTool(); });
-    on("tErase2", function(){ M.tool = "erase"; paintTool(); });
+    on("goCreate", function(){ show("scCreate"); UI.screen = "scCreate"; });
+    on("goJoin",   function(){ show("scJoin");   UI.screen = "scJoin"; });
+    ["backC","backJ"].forEach(function(id){
+      on(id, function(){ show("scLanding"); UI.screen = "scLanding"; paint(); });
+    });
+    on("cGo", doCreate);
+    on("jGo", doJoin);
+    on("resumeBtn", function(){
+      var seat = loadSeat("m");
+      if (seat && seat.code) takeSeat(seat.kind, seat.code, seat.name);
+    });
+    on("resumeDrop", function(){ clearSeat("m"); paint(); });
 
+    on("roleArch",  function(){ pickRole("architect"); });
+    on("roleBuild", function(){ pickRole("builder"); });
+    on("lobReady",  pressReady);
+
+    on("tAdd",   function(){ TOOL = "place"; paintSwatches(); });
+    on("tErase", function(){ TOOL = "erase"; paintSwatches(); });
+    on("bSubmit", submit);
     CKEYS.forEach(function(k){
-      var b = el("sw-" + k);
+      var b = el("sw-" + k); if (!b) return;
       b.innerHTML = cubeSVG(colInfo(k).hex);
       b.addEventListener("pointerdown", function(ev){
         ev.preventDefault();
         try { b.setPointerCapture(ev.pointerId); } catch(e){}
-        keepAwakeOnGesture();
         gdown(ev, k);
       });
     });
 
-    var stage = el("stage");
-    stage.addEventListener("pointerdown", function(ev){
+    var st = el("stage");
+    st.addEventListener("pointerdown", function(ev){
       ev.preventDefault();
-      try { stage.setPointerCapture(ev.pointerId); } catch(e){}
-      keepAwakeOnGesture();
+      try { st.setPointerCapture(ev.pointerId); } catch(e){}
       gdown(ev, null);
     });
     window.addEventListener("pointermove", function(ev){
@@ -1713,58 +2518,48 @@
     }, { passive:false });
     window.addEventListener("pointerup", gup);
     window.addEventListener("pointercancel", function(){
-      G.on = false; G.fromSwatch = false; showTarget(BV, null); carryHide();
+      G.on = false; G.fromSwatch = false; showTarget(null); carryHide();
+    });
+    el("dbBuild").addEventListener("pointerdown", function(ev){
+      ev.preventDefault(); tapDebrief(ev);
     });
 
-    on("bCheck", function(){
-      if (!M.build.length){
-        el("mVerdict").textContent = "Nothing built yet.";
-        el("mVerdict").className = "verdict"; return;
-      }
-      var v = verdictOf(design(), M.build);
-      var df = diffOf(design(), M.build);
-      var wrong = df.extra + df.missing + df.color;
-      el("mVerdict").textContent = v === "PERFECT"
-        ? "PERFECT · nothing out of place"
-        : v + " · " + (wrong === 1 ? "1 cube wrong" : wrong + " cubes wrong");
-      el("mVerdict").className = "verdict " + (v === "PERFECT" ? "good" : "bad");
-    });
-    on("bClear", function(){ M.build = []; paint(); });
-    on("bNext",  function(){ M.ix = (M.ix + 1) % MLIB.length; M.build = []; paint(); });
-    on("bGesture", function(){
-      M.gesture = M.gesture === "press" ? "tap" : "press";
-      el("bGesture").textContent = M.gesture === "press" ? "PRESS + SLIDE" : "TAP";
-    });
-    on("bTheme", function(){ theme(M.theme === "light" ? "dark" : "light"); });
-
-    /* testbed only: switch between the two placement models */
-    on("bModel", function(){
-      M.model = M.model === "free" ? "modes" : "free";
-      M.tool = "place"; M.lastAdd = "place";
-      paintModel(); paintTool(); showTarget(BV, null);
+    ["plView","dbView"].forEach(function(id){ on(id, function(){ setView(VIEW + 1); }); });
+    ["plTheme","dbTheme"].forEach(function(id){
+      on(id, function(){ theme(THEME === "light" ? "dark" : "light"); });
     });
 
-    /* a readable record of what the phone decided, for the console and for
-       test-m-logic, which cannot see inside this closure otherwise */
-    window.RELAY_M = { stamp:STAMP, grid:GRID, maxy:MAXY,
-                       motionReduced:MOTION_REDUCED, glideLong:GLIDE_LONG,
-                       glideLeg:GLIDE_LEG, skipsGlide:reduceMotion, turnMs:TURN_MS, carryLift:CARRY_LIFT,
-                       designs:MLIB.length, secure:window.isSecureContext,
-                       fitZoom:FIT.zoom, fitDrop:FIT.drop,
-                       rule:MRULE, model:M.model,
-                       /* live, so a test can press the view button and see
-                          whether every stage followed */
-                       viewNow: function(){
-                         return { want:M.view, got:VIEWERS.map(function(V){ return V.viewIx; }),
-                                  label:(el("bView")||{}).textContent };
-                       } };
-    theme("light");
+    /* END needs two taps. A stray one must not end a round, but a pair who
+       cannot finish a design has to be able to move on. */
+    var endArmed = 0;
+    on("plEnd", function(){
+      if (Date.now() - endArmed < 3000){ endArmed = 0; el("plEnd").textContent = "END"; endRound(ME); return; }
+      endArmed = Date.now();
+      el("plEnd").textContent = "SURE?";
+      setTimeout(function(){
+        if (Date.now() - endArmed >= 2900){ el("plEnd").textContent = "END"; endArmed = 0; }
+      }, 3000);
+    });
+
+    on("modYes", function(){ if (MODAL && MODAL.onYes) MODAL.onYes(); });
+    on("modNo",  function(){ if (MODAL && MODAL.onNo)  MODAL.onNo(); });
+
+    theme(THEME);
     setView(0);
     refit();
-    paintModel(); paintTool(); paintPane(); paint();
-    keepAwake();
+    paintSwatches();
 
-    /* never let one throw stop the loop — brief §10 */
+    SHARED.subscribe(function(){ onState(); paint(); });
+    paint();
+
+    /* the clock, without repainting the world twice a second */
+    setInterval(function(){
+      var s = S();
+      if (s.phase === "play" && s.round) el("plClock").textContent = mmss(roundMs());
+      if (s.phase === "debrief" && s.round) el("dbClock").textContent = mmss(roundMs());
+    }, 500);
+
+    /* never let one throw stop the loop */
     var last = performance.now();
     (function frame(now){
       try {
@@ -1774,6 +2569,22 @@
         });
       } finally { requestAnimationFrame(frame); }
     })(last);
+
+    window.RELAY_M = {
+      stamp:VERSION, grid:GRID, maxy:MAXY, rule:MRULE, designs:MLIB.length,
+      sessions:SESSION_CODES.slice(), motionReduced:MOTION_REDUCED,
+      turnMs:TURN_MS, skipsGlide:reduceMotion, carryLift:CARRY_LIFT,
+      fitZoom:FIT.zoom, fitDrop:FIT.drop,
+      glideLong:GLIDE_LONG, glideLeg:GLIDE_LEG,
+      secure:window.isSecureContext, sessions2:SESSION_CODES.length,
+      viewNow: function(){
+        return { want:VIEW, got:VIEWERS.map(function(V){ return V.viewIx; }),
+                 label:(el("plView")||{}).textContent };
+      },
+      dealFor: dealFor, tierForRound: tierForRound,
+      encWire: encWire, decWire: decWire, blankState: blankState,
+      freshTeamState: freshTeamState
+    };
   }
 
   if (document.readyState === "loading")
