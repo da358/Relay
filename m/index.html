@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.11</title>
+<title>Relay 260909.12</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -91,6 +91,11 @@
   #lobCode{ font-size:calc(52px * var(--ts)); font-weight:900; letter-spacing:.14em;
             margin:4px 0; }
   #lobShare{ margin:4px 0 0; }
+  #scLobby.later #lobCode{ font-size:calc(21px * var(--ts)); letter-spacing:.10em;
+                           margin:2px 0; }
+  #scLobby.later #lobShare{ display:none; }
+  #scLobby.later #lobPick{ margin-top:52px; }
+  #scLobby.later #lobTold{ margin-top:52px; }
   #lobWait{ margin-top:28px; }
   #lobPick{ margin-top:30px; }
   #lobPick p{ margin:0 0 14px; }
@@ -135,12 +140,16 @@
   #stage canvas, #dbDesign canvas, #dbBuild canvas{
     position:absolute; inset:0; width:100%; height:100%; display:block;
   }
+  /* reversed out, so it reads as a label on the picture rather than another
+     control. The DESIGN pill sits on the same baseline as the buttons beside
+     it: 8px of band padding plus a 40px button, less the pill's own height. */
   .pill{
-    position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:4;
-    background:var(--raise); border:1px solid var(--rule); border-radius:999px;
-    padding:5px 12px; font-size:calc(11px * var(--ts)); font-weight:800;
-    letter-spacing:.10em; color:var(--paper);
+    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:4;
+    background:var(--paper); border:1px solid var(--paper); border-radius:999px;
+    padding:6px 16px; font-size:calc(11px * var(--ts)); font-weight:800;
+    letter-spacing:.12em; color:var(--bg);
   }
+  #dbDesign .pill{ top:22px; }
   #plArchNote{
     flex:1 1 auto; display:flex; align-items:center; justify-content:center;
     text-align:center; padding:14px 24px;
@@ -250,7 +259,7 @@
   <div id="lobCode">----</div>
   <p id="lobShare">Share this with your teammate.</p>
 
-  <div id="lobWait">Waiting for your teammate to join…</div>
+  <div id="lobWait">Waiting for your teammate to join …</div>
 
   <div id="lobPick">
     <p>Choose your role for this round</p>
@@ -339,7 +348,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.11";
+  var VERSION = "260909.12";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -2140,12 +2149,18 @@
         el("lobToldRole").textContent = "You're going to play as " + mineRole.toUpperCase();
         el("lobToldTail").textContent = "for this round.";
       } else {
-        el("lobToldRole").textContent = "Waiting for your teammate to choose roles…";
+        el("lobToldRole").textContent = "Waiting for your teammate to choose roles …";
         el("lobToldTail").textContent = "";
       }
     }
-    /* what the job actually is, said once, where the choice is made */
-    el("lobRoleWords").textContent = mineRole ? ROLEWORDS[mineRole] : "";
+    /* what the job actually is, said once, where the choice is made — and not
+       before there is anyone to make it with */
+    el("lobRoleWords").textContent =
+      (!waiting && mineRole) ? ROLEWORDS[mineRole] : "";
+
+    /* after the first round the code has done its job. Keep it, because a
+       phone that closes needs it back, but stop it shouting. */
+    el("scLobby").classList.toggle("later", (s.done || 0) > 0);
 
     var mine = ME === "host" ? lob.readyHost : lob.readyGuest;
     var can = !waiting && !!lob.hostRole;
@@ -2318,9 +2333,9 @@
   }
   /* one view for every stage on the screen. Two stages facing different ways
      makes the debrief's comparison meaningless. */
-  function setView(i){
+  function setView(i, snap){
     VIEW = ((i % 4) + 4) % 4;
-    VIEWERS.forEach(function(V){ V.stepTo(VIEW); });
+    VIEWERS.forEach(function(V){ if (snap) V.snapTo(VIEW); else V.stepTo(VIEW); });
     ["plView","dbView"].forEach(function(id){
       var b = el(id); if (b) b.textContent = "VIEW " + (VIEW + 1);
     });
@@ -2509,8 +2524,19 @@
 
   /* ---------- reacting to the state, then painting ---------- */
   /* Anything that changes local state lives here. paint() only reads. */
+  var lastRoundId = null;
   function onState(){
     var s = S(), r = s.round;
+    /* a new round starts clean on both phones: the same view, and the Builder
+       in ADD. Carrying the last round's view over means the two players are
+       looking at the board from different sides before either has said a
+       word, which is the one thing the numbered views exist to prevent. */
+    if (r && r.id !== lastRoundId){
+      lastRoundId = r.id;
+      setView(0, true);
+      TOOL = "place"; paintSwatches();
+    }
+    if (!r) lastRoundId = null;
     if (!r){ BUILD = []; lastBuildSig = ""; lastDesign = ""; TAPPED = -1; UI.tapNote = ""; }
     else if (!amArchitect() && !BUILD.length && r.build && r.build.length)
       BUILD = r.build.slice();            // a reload, or this phone rejoining
