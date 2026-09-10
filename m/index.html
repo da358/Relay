@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.7</title>
+<title>Relay mobile touch testbed 260909.8</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -617,7 +617,8 @@
      from library-260906 that already fit a 4x4x4 plate. Every
      design translated onto that plate; verdictOf normalises to
      the minimum corner, so the move changes no scoring.
-     Tiers are E, M, H. No face marks anywhere. Rule is grounded.
+     Ordered easy, then medium, then hard. No face marks
+     anywhere. Rule is grounded.
      ========================================================== */
   var MDESIGNS = [
     { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"E",
@@ -740,21 +741,6 @@
     { id:"d-x6kmg5", family:"d-v6xa1s", name:"emu v5", tier:"M",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[1,0,1,"b",0],[1,1,1,"b",0],[1,1,2,"y",0],[1,1,0,"b",0],[1,2,0,"y",0],[1,3,0,"y",0],[0,3,0,"p",0],[2,3,0,"p",0]] },
-    { id:"d-omesmf", family:"d-omesmf", name:"arch", tier:"H",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[0,0,3,"b",0],[0,1,3,"o",0],[0,2,3,"p",0],[0,0,0,"o",0],[0,1,0,"b",0],[0,2,0,"y",0],[0,2,1,"p",0],[0,2,2,"o",0],[1,2,2,"b",0],[2,2,2,"o",0],[2,3,2,"p",0]] },
-    { id:"d-xtv8az", family:"d-omesmf", name:"arch v2", tier:"H",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[3,0,0,"o",0],[3,1,0,"p",0],[3,2,0,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[1,2,0,"b",0],[2,2,0,"p",0],[2,2,1,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
-    { id:"d-gl71nq", family:"d-omesmf", name:"arch v3", tier:"H",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[0,0,0,"b",0],[0,1,0,"y",0],[0,2,0,"o",0],[0,0,3,"y",0],[0,1,3,"b",0],[0,2,3,"p",0],[0,2,2,"o",0],[0,2,1,"y",0],[1,2,1,"b",0],[2,2,1,"y",0],[2,3,1,"o",0]] },
-    { id:"d-avitrw", family:"d-omesmf", name:"arch v4", tier:"H",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,0,"o",0],[2,1,0,"b",0],[2,2,0,"y",0],[2,0,3,"b",0],[2,1,3,"o",0],[2,2,3,"p",0],[2,2,2,"y",0],[2,2,1,"b",0],[1,2,1,"o",0],[0,2,1,"b",0],[0,3,1,"y",0]] },
-    { id:"d-awglto", family:"d-omesmf", name:"arch v5", tier:"H",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[0,0,3,"o",0],[0,1,3,"p",0],[0,2,3,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[0,2,1,"b",0],[0,2,2,"p",0],[1,2,2,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
     { id:"d-m9gfu2", family:"d-m9gfu2", name:"vine", tier:"M",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"b",0],[1,0,1,"o",0],[1,1,1,"p",0],[1,2,1,"p",0],[1,2,2,"b",0],[1,3,2,"o",0]] },
@@ -785,6 +771,21 @@
     { id:"d-1tjo4i", family:"d-ht9z4q", name:"reach v5", tier:"M",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[1,0,0,"p",0],[1,0,1,"b",0],[1,1,1,"y",0],[1,1,2,"p",0],[2,1,2,"y",0],[0,1,2,"b",0],[0,2,2,"y",0],[0,3,2,"p",0]] },
+    { id:"d-omesmf", family:"d-omesmf", name:"arch", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,3,"b",0],[0,1,3,"o",0],[0,2,3,"p",0],[0,0,0,"o",0],[0,1,0,"b",0],[0,2,0,"y",0],[0,2,1,"p",0],[0,2,2,"o",0],[1,2,2,"b",0],[2,2,2,"o",0],[2,3,2,"p",0]] },
+    { id:"d-xtv8az", family:"d-omesmf", name:"arch v2", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[3,0,0,"o",0],[3,1,0,"p",0],[3,2,0,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[1,2,0,"b",0],[2,2,0,"p",0],[2,2,1,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
+    { id:"d-gl71nq", family:"d-omesmf", name:"arch v3", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,0,"b",0],[0,1,0,"y",0],[0,2,0,"o",0],[0,0,3,"y",0],[0,1,3,"b",0],[0,2,3,"p",0],[0,2,2,"o",0],[0,2,1,"y",0],[1,2,1,"b",0],[2,2,1,"y",0],[2,3,1,"o",0]] },
+    { id:"d-avitrw", family:"d-omesmf", name:"arch v4", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"o",0],[2,1,0,"b",0],[2,2,0,"y",0],[2,0,3,"b",0],[2,1,3,"o",0],[2,2,3,"p",0],[2,2,2,"y",0],[2,2,1,"b",0],[1,2,1,"o",0],[0,2,1,"b",0],[0,3,1,"y",0]] },
+    { id:"d-awglto", family:"d-omesmf", name:"arch v5", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,3,"o",0],[0,1,3,"p",0],[0,2,3,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[0,2,1,"b",0],[0,2,2,"p",0],[1,2,2,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
     { id:"d-df7x45", family:"d-df7x45", name:"alert", tier:"H",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"p",0],[2,1,0,"p",0],[2,0,2,"o",0],[2,1,2,"y",0],[2,1,1,"b",0],[1,1,2,"b",0],[0,1,2,"y",0],[0,2,2,"o",0],[0,2,3,"b",0]] },
@@ -1315,7 +1316,7 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.7";
+  var STAMP = "260909.8";
 
   var M = {
     ix: 0,               // which design we are looking at
@@ -1326,6 +1327,7 @@
     build: [],
     gesture: "press",    // press | tap
     pane: "build",       // build | design
+    view: 0,             // ONE view for every stage on the screen
     theme: "dark",
     taps: 0, misfires: 0 // a rough count, shown in the footer
   };
@@ -1583,7 +1585,7 @@
     ORBIT = ORBIT0 * FIT.zoom;
     LIFT  = LIFT0  * FIT.zoom;
     CENTRE.y = CY0 + FIT.drop;
-    VIEWERS.forEach(function(V){ V.snapTo(V.viewIx); });
+    VIEWERS.forEach(function(V){ V.snapTo(M.view); });
     if (window.RELAY_M){ window.RELAY_M.fitZoom = FIT.zoom; window.RELAY_M.fitDrop = FIT.drop; }
   }
 
@@ -1611,6 +1613,20 @@
       '<path d="M8,30 50,54 92,30 M50,54 50,102" fill="none" ' +
       'stroke="rgba(0,0,0,.28)" stroke-width="2.5" stroke-linejoin="round"/>' +
       '</svg>';
+  }
+
+  /* ---------- the view every stage shares ---------- */
+  /* 260909.7 gave each viewer its own view index and stepped only the one on
+     screen. Switching panes then left the button showing the other stage's
+     number and the two stages pointing different ways, which makes copying a
+     design from memory impossible. There is one view on a screen, not one per
+     canvas — and that is also what the debrief needs, where the design and the
+     build sit side by side and must be seen from the same angle. */
+  function setView(i){
+    M.view = ((i % 4) + 4) % 4;
+    VIEWERS.forEach(function(V){ V.stepTo(M.view); });
+    var b = el("bView");
+    if (b) b.textContent = "VIEW " + (M.view + 1);
   }
 
   /* ---------- the palette ---------- */
@@ -1664,12 +1680,7 @@
     BV = makeViewer(el("cvBuild"),  { fov:46 });
 
     /* the four presets, stepped one button at a time */
-    on("bView", function(){
-      var V = M.pane === "build" ? BV : DV;
-      var nx = (V.viewIx + 1) % 4;
-      V.stepTo(nx);
-      el("bView").textContent = "VIEW " + (nx + 1);
-    });
+    on("bView", function(){ setView(M.view + 1); });
 
     on("paneBuild",  function(){ M.pane = "build";  paintPane(); });
     on("paneDesign", function(){ M.pane = "design"; paintPane(); });
@@ -1740,8 +1751,15 @@
                        glideLeg:GLIDE_LEG, skipsGlide:reduceMotion, turnMs:TURN_MS, carryLift:CARRY_LIFT,
                        designs:MLIB.length, secure:window.isSecureContext,
                        fitZoom:FIT.zoom, fitDrop:FIT.drop,
-                       rule:MRULE, model:M.model };
+                       rule:MRULE, model:M.model,
+                       /* live, so a test can press the view button and see
+                          whether every stage followed */
+                       viewNow: function(){
+                         return { want:M.view, got:VIEWERS.map(function(V){ return V.viewIx; }),
+                                  label:(el("bView")||{}).textContent };
+                       } };
     theme("light");
+    setView(0);
     refit();
     paintModel(); paintTool(); paintPane(); paint();
     keepAwake();
