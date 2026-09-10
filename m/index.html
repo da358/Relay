@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.4</title>
+<title>Relay mobile touch testbed 260909.5</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -62,7 +62,7 @@
   }
 
   #stage{
-    position:relative; flex:1 1 auto; min-height:44vh;
+    position:relative; flex:1 1 auto; min-height:52vh;
     background:var(--panel); touch-action:none; overflow:hidden;
   }
   #stage canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
@@ -83,8 +83,8 @@
     text-align:right; line-height:1.18;
   }
 
-  #builderBar{ flex:0 0 auto; padding:10px 12px 4px; }
-  #swatches{ display:flex; gap:10px; margin:12px 0 0; }
+  #builderBar{ flex:0 0 auto; padding:8px 12px 2px; }
+  #swatches{ display:flex; gap:10px; margin:9px 0 0; }
   #swatches button{
     flex:1 1 0; height:66px; padding:3px; border-radius:12px;
     border:3px solid transparent; background:transparent;
@@ -95,11 +95,11 @@
   #swatches button.off{ opacity:.30; }
   #swatches svg{ display:block; width:100%; height:100%; pointer-events:none; }
 
-  #actions{ display:flex; gap:8px; margin-top:12px; }
+  #actions{ display:flex; gap:8px; margin-top:9px; }
   #actions button{ flex:1 1 0; }
 
   .verdict{
-    margin:12px 0 0; min-height:calc(24px * var(--ts));
+    margin:9px 0 0; min-height:calc(22px * var(--ts));
     font-weight:800; font-size:calc(17px * var(--ts)); letter-spacing:.04em;
   }
   .verdict.good{ color:var(--green); }
@@ -112,6 +112,21 @@
     color:var(--dim); font-size:calc(12px * var(--ts));
   }
   footer #mFoot{ flex:1 1 auto; }
+
+  /* testbed only: the framing strip does not exist in the real game */
+  #fitBar{
+    flex:0 0 auto; display:flex; align-items:center; gap:6px;
+    padding:6px 12px 0; color:var(--dim);
+    font-size:calc(11px * var(--ts)); white-space:nowrap;
+  }
+  #fitBar .lbl{ font-weight:700; letter-spacing:.08em; }
+  #fitBar #mFit{ margin-left:auto; }
+  button.tiny{
+    appearance:none; border:1px solid var(--rule); border-radius:8px;
+    background:var(--raise); color:var(--paper);
+    font:inherit; font-weight:700; font-size:calc(11px * var(--ts));
+    padding:7px 8px; min-height:34px;
+  }
 
   /* the cube you are carrying: follows the finger, never intercepts it */
   #carry{
@@ -166,6 +181,15 @@
 </div>
 
 <div id="carry"></div>
+
+<div id="fitBar">
+  <span class="lbl">fit</span>
+  <button class="tiny" id="fBig">BIGGER</button>
+  <button class="tiny" id="fSmall">SMALLER</button>
+  <button class="tiny" id="fDown">DOWN</button>
+  <button class="tiny" id="fUp">UP</button>
+  <span id="mFit"></span>
+</div>
 
 <footer>
   <span id="mFoot"></span>
@@ -1036,7 +1060,7 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.4";
+  var STAMP = "260909.5";
 
   var M = {
     ix: 0,               // which design we are looking at
@@ -1261,6 +1285,27 @@
       " · " + STAMP;
   }
 
+  /* ---------- how much of the canvas the build fills ---------- */
+  /* Section 13 frames the scene for a laptop, where there is room to spare. A
+     phone has none, so the camera comes in closer and looks a little above the
+     plate, which pushes the build down the canvas and lets it be bigger. Both
+     numbers are live in the testbed so they can be settled on a real screen
+     instead of estimated from here; the winning pair gets baked into the game
+     and the control disappears. */
+  var ORBIT0 = ORBIT, LIFT0 = LIFT, CY0 = CENTRE.y;
+  var FIT = { zoom:0.92, drop:0.55 };
+  function refit(){
+    FIT.zoom = Math.max(0.68, Math.min(1.25, FIT.zoom));
+    FIT.drop = Math.max(-0.60, Math.min(1.80, FIT.drop));
+    ORBIT = ORBIT0 * FIT.zoom;
+    LIFT  = LIFT0  * FIT.zoom;
+    CENTRE.y = CY0 + FIT.drop;
+    VIEWERS.forEach(function(V){ V.snapTo(V.viewIx); });
+    if (window.RELAY_M){ window.RELAY_M.fitZoom = FIT.zoom; window.RELAY_M.fitDrop = FIT.drop; }
+    var r = el("mFit");
+    if (r) r.textContent = "size " + FIT.zoom.toFixed(2) + " · drop " + FIT.drop.toFixed(2);
+  }
+
   /* ---------- a swatch is a cube, not a square ---------- */
   /* Three faces of one colour, so the control looks like the thing it puts on
      the board. Lit the same way as the scene: top brightest, right darkest. */
@@ -1397,13 +1442,21 @@
     });
     on("bTheme", function(){ theme(M.theme === "light" ? "dark" : "light"); });
 
+    /* testbed only: find the framing on a real screen */
+    on("fBig",  function(){ FIT.zoom -= 0.04; refit(); });   // closer camera, bigger build
+    on("fSmall",function(){ FIT.zoom += 0.04; refit(); });
+    on("fDown", function(){ FIT.drop += 0.15; refit(); });
+    on("fUp",   function(){ FIT.drop -= 0.15; refit(); });
+
     /* a readable record of what the phone decided, for the console and for
        test-m-logic, which cannot see inside this closure otherwise */
     window.RELAY_M = { stamp:STAMP, grid:GRID, maxy:MAXY,
                        motionReduced:MOTION_REDUCED, glideLong:GLIDE_LONG,
                        glideLeg:GLIDE_LEG, skipsGlide:reduceMotion, turnMs:TURN_MS, carryLift:CARRY_LIFT,
-                       designs:MLIB.length, secure:window.isSecureContext };
+                       designs:MLIB.length, secure:window.isSecureContext,
+                       fitZoom:FIT.zoom, fitDrop:FIT.drop };
     theme("light");
+    refit();
     paintTool(); paintPane(); paint();
     keepAwake();
 
