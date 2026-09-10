@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.16</title>
+<title>Relay 260909.17</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -129,6 +129,16 @@
                    line-height:1.16; font-weight:600; padding-top:2px; }
   .stageTop .k{ min-height:40px; padding:8px 10px; }
   #plEnd.armed{ background:var(--red); color:#fff; border-color:var(--red); }
+  #plHelp{ font-weight:800; min-width:40px; text-align:center; }
+  /* the card shrinks into this, so it has to answer. A short bulge, eased out
+     past its own size and back, is the whole message: the thing you just
+     closed now lives here. */
+  @keyframes bulge{
+    0%{ transform:scale(1); }
+    42%{ transform:scale(1.45); }
+    100%{ transform:scale(1); }
+  }
+  #plHelp.bulge{ animation:bulge var(--bulge, 380ms) cubic-bezier(.34,1.15,.5,1); }
 
   #stage, #dbDesign, #dbBuild{
     position:relative; background:var(--panel); touch-action:none; overflow:hidden;
@@ -288,6 +298,7 @@
       <span class="hint">Tap to<br>change<br>views</span>
       <span class="grow"></span>
       <span class="nethint" id="netHint"></span>
+      <button class="k" id="plHelp" aria-label="What is my job?">?</button>
       <button class="k" id="plTheme">DARK</button>
       <button class="k" id="plEnd">END</button>
     </div>
@@ -347,7 +358,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.16";
+  var VERSION = "260909.17";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -2531,6 +2542,39 @@
     commit(t);
   }
 
+  /* ---------- putting the card away where it lives ---------- */
+  /* Two numbers, both here. The card travels to the "?" and shrinks into it;
+     the "?" then swells briefly. A phone asking for reduced motion gets
+     neither and just closes. */
+  var SHRINK_MS = 340, BULGE_MS = 380;
+  function shrinkToHelp(then){
+    var box = el("modBox"), q = el("plHelp"), back = el("modal");
+    if (!box || !q || MOTION_REDUCED || !q.getBoundingClientRect().width){
+      return then();
+    }
+    var b = box.getBoundingClientRect(), t = q.getBoundingClientRect();
+    var dx = (t.left + t.width / 2) - (b.left + b.width / 2);
+    var dy = (t.top + t.height / 2) - (b.top + b.height / 2);
+    box.style.transformOrigin = "center center";
+    box.style.transition = "transform " + SHRINK_MS + "ms cubic-bezier(.45,0,.9,.45)" +
+                           ", opacity " + SHRINK_MS + "ms ease-in";
+    box.style.transform = "translate(" + dx + "px," + dy + "px) scale(.06)";
+    box.style.opacity = "0";
+    back.style.transition = "background-color " + SHRINK_MS + "ms ease-in";
+    back.style.backgroundColor = "rgba(0,0,0,0)";
+    setTimeout(function(){
+      box.style.transition = ""; box.style.transform = ""; box.style.opacity = "";
+      box.style.transformOrigin = "";
+      back.style.transition = ""; back.style.backgroundColor = "";
+      q.style.setProperty("--bulge", BULGE_MS + "ms");
+      q.classList.remove("bulge");
+      void q.offsetWidth;                     // restart the animation
+      q.classList.add("bulge");
+      setTimeout(function(){ q.classList.remove("bulge"); }, BULGE_MS + 40);
+      then();
+    }, SHRINK_MS);
+  }
+
   /* ---------- tapping a flagged cube in the debrief ---------- */
   function tapDebrief(ev){
     var s = S(); if (s.phase !== "debrief" || !RB) return;
@@ -2703,7 +2747,16 @@
       }, 3000);
     });
 
-    on("modYes", function(){ if (MODAL && MODAL.onYes) MODAL.onYes(); });
+    /* a card with one way out is being put away, not answered. Show it going
+       where it now lives, then do the thing. */
+    on("modYes", function(){
+      if (!MODAL || !MODAL.onYes) return;
+      if (MODAL.only) shrinkToHelp(MODAL.onYes); else MODAL.onYes();
+    });
+    on("plHelp", function(){
+      var role = myRole();
+      if (role){ ROLECARD = role; paint(); }
+    });
     on("modNo",  function(){ if (MODAL && MODAL.onNo)  MODAL.onNo(); });
 
     var lv = el("landVer"); if (lv) lv.textContent = "Relay " + VERSION;
