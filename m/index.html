@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.10</title>
+<title>Relay 260909.11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -37,8 +37,8 @@
   button.big{
     appearance:none; border:1px solid var(--rule); border-radius:14px;
     background:var(--cyan); color:#fff; font:inherit; font-weight:800;
-    font-size:calc(19px * var(--ts)); letter-spacing:.06em;
-    padding:20px 16px; width:100%; min-height:62px;
+    font-size:calc(18px * var(--ts)); letter-spacing:.06em;
+    padding:14px 16px; width:100%; min-height:52px;
   }
   button.big.plain{ background:var(--raise); color:var(--paper); }
   button.big:disabled{ opacity:.42; }
@@ -51,7 +51,7 @@
   .seg button{
     flex:1; appearance:none; border:2px solid var(--rule); border-radius:12px;
     background:var(--raise); color:var(--dim); font:inherit; font-weight:800;
-    font-size:calc(16px * var(--ts)); padding:16px 8px; min-height:58px;
+    font-size:calc(16px * var(--ts)); padding:11px 8px; min-height:48px;
   }
   .seg button.on{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
   label{ display:block; margin:18px 0 0; font-size:calc(13px * var(--ts));
@@ -79,24 +79,24 @@
                font:inherit; font-size:calc(13px * var(--ts)); text-decoration:underline; }
 
   /* ---------- lobby ---------- */
+  /* One body size for everything that is not a button, one heading, and the
+     team code. Three sizes on the whole screen. */
   #scLobby{ padding:22px 20px; text-align:center; }
-  #lobRound{ color:var(--dim); font-size:calc(13px * var(--ts));
-             letter-spacing:.10em; font-weight:700; }
-  #lobIntro{ margin:18px 0 6px; }
-  #lobCode{ font-size:calc(52px * var(--ts)); font-weight:900; letter-spacing:.14em;
-            margin:6px 0; }
-  #lobShare{ color:var(--dim); }
-  #lobWait{ margin-top:28px; color:var(--dim); }
-  #lobPick{ margin-top:30px; }
-  #lobPick p, #lobTold{ margin:0 0 14px; }
-  #lobTold{ margin-top:30px; }
-  #lobToldRole{ font-weight:800; }
-  #lobRoleWords{
-    margin:14px auto 0; max-width:420px; color:var(--dim);
-    font-size:calc(14px * var(--ts)); line-height:1.42; min-height:22px;
+  #scLobby p, #scLobby div:not(#lobCode):not(#lobRound):not(.seg){
+    font-size:calc(17px * var(--ts)); font-weight:400; color:var(--paper);
+    line-height:1.45;
   }
+  #lobRound{ font-size:calc(21px * var(--ts)); font-weight:800; }
+  #lobIntro{ margin:22px 0 4px; }
+  #lobCode{ font-size:calc(52px * var(--ts)); font-weight:900; letter-spacing:.14em;
+            margin:4px 0; }
+  #lobShare{ margin:4px 0 0; }
+  #lobWait{ margin-top:28px; }
+  #lobPick{ margin-top:30px; }
+  #lobPick p{ margin:0 0 14px; }
+  #lobTold{ margin:30px 0 0; }
+  #lobRoleWords{ margin:14px auto 0; max-width:420px; min-height:22px; }
   #lobReady{ margin-top:auto; }
-  #lobHint{ color:var(--dim); font-size:calc(13px * var(--ts)); min-height:20px; margin-top:10px; }
 
   /* ---------- play and debrief ---------- */
   .bar{
@@ -111,59 +111,63 @@
   .bar .sess{ white-space:nowrap; }
   .nethint{ color:var(--dim); }
   .nethint.off{ color:var(--red); font-weight:700; }
-  .tools{ display:flex; align-items:center; gap:8px; padding:8px 12px 0; flex:0 0 auto; }
-  .tools .hint{ color:var(--dim); font-size:calc(12px * var(--ts)); line-height:1.18; }
+  /* every stage control lives on the stage, in one band. A separate strip
+     above it cost 52px of height that the SUBMIT button needed. */
+  .stageTop{
+    position:absolute; top:0; left:0; right:0; z-index:3;
+    display:flex; align-items:flex-start; gap:8px; padding:8px 10px;
+    pointer-events:none;
+  }
+  .stageTop > *{ pointer-events:auto; }
+  .stageTop .grow{ flex:1 1 auto; pointer-events:none; }
+  .stageTop .hint{ color:var(--dim); font-size:calc(11px * var(--ts));
+                   line-height:1.16; font-weight:600; padding-top:2px; }
+  .stageTop .k{ min-height:40px; padding:8px 10px; }
 
   #stage, #dbDesign, #dbBuild{
     position:relative; background:var(--panel); touch-action:none; overflow:hidden;
   }
-  #stage{ flex:1 1 auto; min-height:52vh; }
-  /* the Architect has no controls under the stage, so cap it rather than let
-     it fill the screen — a very tall canvas crops the plate at the sides */
-  #scPlay.arch #stage{ flex:0 0 auto; height:58vh; min-height:0; }
-  .viewRow{
-    position:absolute; top:10px; left:10px; z-index:3;
-    display:flex; align-items:center; gap:10px;
-  }
-  .viewRow .hint{ color:var(--dim); font-size:calc(12px * var(--ts));
-                  line-height:1.18; font-weight:600; text-align:left; padding-left:2px; }
-  #dbView{ position:absolute; top:8px; right:10px; z-index:3; }
-  #dbDesign, #dbBuild{ flex:1 1 50%; min-height:24vh; }
+  /* the stage yields to the controls, never the other way round: on a short
+     phone the SUBMIT button must always be reachable */
+  #stage{ flex:1 1 auto; min-height:30vh; }
+  #scPlay.arch #stage{ flex:0 0 auto; height:56vh; min-height:0; }
+  #dbDesign, #dbBuild{ flex:1 1 50%; min-height:0; }
   #stage canvas, #dbDesign canvas, #dbBuild canvas{
     position:absolute; inset:0; width:100%; height:100%; display:block;
   }
   .pill{
-    position:absolute; top:8px; left:10px; z-index:3;
+    position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:4;
     background:var(--raise); border:1px solid var(--rule); border-radius:999px;
     padding:5px 12px; font-size:calc(11px * var(--ts)); font-weight:800;
     letter-spacing:.10em; color:var(--paper);
   }
   #plArchNote{
     flex:1 1 auto; display:flex; align-items:center; justify-content:center;
-    text-align:center; padding:18px 24px;
+    text-align:center; padding:14px 24px;
     color:var(--dim); font-size:calc(15px * var(--ts)); line-height:1.45;
   }
 
-  #builderBar{ flex:0 0 auto; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); }
-  #swatches{ display:flex; gap:10px; margin:9px 0 0; }
+  #builderBar{ flex:0 0 auto; padding:8px 12px calc(6px + env(safe-area-inset-bottom)); }
+  #swatches{ display:flex; gap:10px; margin:8px 0 0; }
   #swatches button{
-    flex:1 1 0; height:64px; padding:3px; border-radius:12px;
+    flex:1 1 0; height:56px; padding:2px; border-radius:12px;
     border:3px solid transparent; background:transparent;
     display:flex; align-items:center; justify-content:center; touch-action:none;
   }
   #swatches button.on{ border-color:var(--paper); background:var(--raise); }
   #swatches button.off{ opacity:.30; }
   #swatches svg{ display:block; width:100%; height:100%; pointer-events:none; }
-  #bSubmit{ margin-top:10px; }
-  #mCount{ color:var(--dim); font-size:calc(12px * var(--ts)); }
+  #bSubmit{ margin-top:8px; }
+  #mCount{ color:var(--dim); font-size:calc(11px * var(--ts)); text-align:center;
+           min-height:14px; margin-top:2px; }
 
-  #dbFoot{ flex:0 0 auto; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
-  .verdict{ font-weight:900; letter-spacing:.06em; font-size:calc(20px * var(--ts)); }
+  #dbFoot{ flex:0 0 auto; padding:8px 14px calc(6px + env(safe-area-inset-bottom)); }
+  .verdict{ font-weight:900; letter-spacing:.06em; font-size:calc(19px * var(--ts)); }
   .verdict.good{ color:var(--green); }
   .verdict.bad{ color:var(--red); }
   #dbErrors{ margin-top:4px; font-size:calc(15px * var(--ts)); }
-  #dbTap{ margin-top:4px; min-height:20px; color:var(--dim); font-size:calc(13px * var(--ts)); }
-  #dbGo{ margin-top:10px; }
+  #dbTap{ margin-top:2px; min-height:18px; color:var(--dim); font-size:calc(13px * var(--ts)); }
+  #dbGo{ margin-top:8px; }
 
   /* ---------- modal and carry ---------- */
   #modal{
@@ -208,7 +212,7 @@
       <button id="resumeDrop">forget this team</button>
     </div>
   </div>
-  <div class="copy">© Set Forth LLC</div>
+  <div class="copy"><span id="landVer"></span><br>© Set Forth LLC</div>
 </section>
 
 <!-- ============ CREATE ============ -->
@@ -241,10 +245,10 @@
 
 <!-- ============ LOBBY ============ -->
 <section class="screen" id="scLobby">
-  <div id="lobRound">ROUND 1</div>
-  <p id="lobIntro">Welcome to the lobby. Your team code is</p>
+  <div id="lobRound">Round 1 Lobby</div>
+  <p id="lobIntro">Your team code is</p>
   <div id="lobCode">----</div>
-  <div id="lobShare">Share this with your teammate.</div>
+  <p id="lobShare">Share this with your teammate.</p>
 
   <div id="lobWait">Waiting for your teammate to join…</div>
 
@@ -260,7 +264,6 @@
   <p id="lobRoleWords"></p>
 
   <button class="big" id="lobReady" disabled>READY?</button>
-  <div id="lobHint"></div>
 </section>
 
 <!-- ============ PLAY ============ -->
@@ -270,20 +273,18 @@
     <span class="clock" id="plClock">0:00</span>
     <span class="sess" id="plSess"></span>
   </div>
-  <div class="tools">
-    <span class="grow"></span>
-    <span class="nethint" id="netHint"></span>
-    <button class="k" id="plTheme">DARK</button>
-    <button class="k" id="plEnd">END</button>
-  </div>
   <div id="stage">
-    <div class="viewRow">
+    <div class="stageTop">
       <button class="k" id="plView">VIEW 1</button>
       <span class="hint">Tap to<br>change<br>views</span>
+      <span class="grow"></span>
+      <span class="nethint" id="netHint"></span>
+      <button class="k" id="plTheme">DARK</button>
+      <button class="k" id="plEnd">END</button>
     </div>
     <canvas id="cvPlay"></canvas>
   </div>
-  <div id="plArchNote">Describe this to your teammate. They cannot see it.</div>
+  <div id="plArchNote">Describe this to your teammate.<br>They cannot see it.</div>
   <div id="builderBar">
     <div class="seg">
       <button id="tAdd" class="on">ADD</button>
@@ -305,13 +306,15 @@
     <span class="clock" id="dbClock">0:00</span>
     <span class="sess" id="dbSess"></span>
   </div>
-  <div class="tools">
-    <span class="grow"></span>
-    <button class="k" id="dbTheme">DARK</button>
+  <div id="dbDesign">
+    <div class="stageTop">
+      <button class="k" id="dbView">VIEW 1</button>
+      <span class="grow"></span>
+      <button class="k" id="dbTheme">DARK</button>
+    </div>
+    <span class="pill">DESIGN</span>
+    <canvas id="cvDesRev"></canvas>
   </div>
-  <div id="dbDesign"><span class="pill">DESIGN</span>
-    <button class="k" id="dbView">VIEW 1</button>
-    <canvas id="cvDesRev"></canvas></div>
   <div id="dbBuild"><span class="pill">BUILT</span><canvas id="cvBldRev"></canvas></div>
   <div id="dbFoot">
     <div class="verdict" id="dbVerdict"></div>
@@ -336,7 +339,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.10";
+  var VERSION = "260909.11";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -769,10 +772,6 @@
 
   /* ==========================================================
      M1. THE DESIGN SET · 70 designs, 14 families
-     Five families authored for the phone in maker 260903.5
-     (vine, reach, alert, slouch, perk) and nine carried over
-     from library-260906 that fit a 4x4x4 plate. Ordered easy,
-     medium, hard. No face marks. Rule is grounded.
      ========================================================== */
   var MDESIGNS = [
     { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"E",
@@ -2088,15 +2087,22 @@
      ========================================================== */
   var lastScreen = "", lastDesign = "", lastBuildSig = "";
 
-  function paint(){
-    var s = S(), want = screenFor();
-    if (want !== lastScreen){ show(want); lastScreen = want; }
+  /* One decision about the modal per paint, taken here rather than by each
+     painter. 260909.10 let the guest's "Return to lobby?" survive the move to
+     the lobby, because paintLobby never mentioned the modal and so never took
+     it down — leaving a box on top of a screen whose buttons did nothing. A
+     screen that does not raise a modal must actively say so. */
+  var PENDING = null;
 
-    if (want === "scLanding") return paintLanding();
-    if (want === "scCreate" || want === "scJoin") return;
-    if (want === "scLobby")  return paintLobby();
-    if (want === "scPlay")   return paintPlay();
-    if (want === "scDebrief")return paintDebrief();
+  function paint(){
+    var want = screenFor();
+    if (want !== lastScreen){ show(want); lastScreen = want; }
+    PENDING = null;
+    if (want === "scLanding") paintLanding();
+    else if (want === "scLobby")   paintLobby();
+    else if (want === "scPlay")    paintPlay();
+    else if (want === "scDebrief") paintDebrief();
+    modal(PENDING);
   }
 
   function paintLanding(){
@@ -2112,11 +2118,8 @@
   function paintLobby(){
     var s = S(), lob = s.lobby || {};
     el("lobCode").textContent = s.team.code;
-    el("lobIntro").textContent = ME === "host"
-      ? "Welcome to the lobby. Your team code is"
-      : "Welcome to the lobby. Your team code is";
     el("lobShare").style.display = ME === "host" ? "block" : "none";
-    el("lobRound").textContent = "Round " + ((s.done || 0) + 1);
+    el("lobRound").textContent = "Round " + ((s.done || 0) + 1) + " Lobby";
 
     var waiting = !s.team.guest;
     el("lobWait").style.display = waiting ? "block" : "none";
@@ -2149,8 +2152,6 @@
     var b = el("lobReady");
     b.disabled = !can || mine;
     b.textContent = mine ? "WAITING …" : "READY?";
-    el("lobHint").textContent = !s.team.guest
-      ? "" : (mine ? "" : (can ? "" : "Waiting for your teammate to choose roles…"));
   }
 
   function header(pfx){
@@ -2177,20 +2178,19 @@
     if (arch){
       if (lastDesign !== r.designId){ BV.paint(d.cubes, "none", {}); lastDesign = r.designId; }
       /* the confirmation, blind: the Architect never sees the build */
-      modal(r.submitted ? {
+      PENDING = r.submitted ? {
         head: r.names[r.hostRole === "architect" ? "guest" : "host"] + " says the build is done.",
         body: "Lock it in and see how you did?",
         yes: "YES", no: "NO",
         onYes: function(){ confirmSubmit(true); },
         onNo:  function(){ confirmSubmit(false); }
-      } : null);
+      } : null;
     } else {
       var sig = JSON.stringify(BUILD);
       if (sig !== lastBuildSig){ BV.paint(BUILD, "none", {}); lastBuildSig = sig; }
       var sb = el("bSubmit");
       sb.disabled = !BUILD.length || r.submitted;
       sb.textContent = r.submitted ? "WAITING …" : "SUBMIT";
-      modal(null);
     }
     el("mCount").textContent = arch ? "" :
       BUILD.length + (BUILD.length === 1 ? " cube" : " cubes");
@@ -2225,16 +2225,15 @@
       hb.style.display = "block";
       hb.disabled = !!r.asked;
       hb.textContent = r.asked ? "WAITING …" : "RETURN TO LOBBY";
-      modal(null);
     } else {
       el("dbGo").style.display = "none";
-      modal(r.asked ? {
+      PENDING = r.asked ? {
         head: "Return to lobby?",
         body: "Your teammate is ready for the next round.",
         yes: "YES", no: "NO",
         onYes: function(){ answerReturn(true); },
         onNo:  function(){ answerReturn(false); }
-      } : null);
+      } : null;
     }
   }
 
@@ -2565,6 +2564,9 @@
 
     var st = el("stage");
     st.addEventListener("pointerdown", function(ev){
+      /* the view, theme and end buttons now sit over the stage. A press on one
+         of them must not also start placing a cube underneath it. */
+      if (ev.target && ev.target.closest && ev.target.closest(".stageTop")) return;
       ev.preventDefault();
       try { st.setPointerCapture(ev.pointerId); } catch(e){}
       gdown(ev, null);
@@ -2577,6 +2579,7 @@
       G.on = false; G.fromSwatch = false; showTarget(null); carryHide();
     });
     el("dbBuild").addEventListener("pointerdown", function(ev){
+      if (ev.target && ev.target.closest && ev.target.closest(".stageTop")) return;
       ev.preventDefault(); tapDebrief(ev);
     });
 
@@ -2600,6 +2603,7 @@
     on("modYes", function(){ if (MODAL && MODAL.onYes) MODAL.onYes(); });
     on("modNo",  function(){ if (MODAL && MODAL.onNo)  MODAL.onNo(); });
 
+    var lv = el("landVer"); if (lv) lv.textContent = "Relay " + VERSION;
     theme(THEME);
     setView(0);
     refit();
