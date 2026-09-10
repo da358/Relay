@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.17</title>
+<title>Relay 260909.18</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -358,7 +358,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.17";
+  var VERSION = "260909.18";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -1946,6 +1946,21 @@
   function markRole(role){
     try { localStorage.setItem("relay.m.role." + role, "1"); } catch(e){}
   }
+  /* Creating or joining a team is a phone starting fresh, so it forgets which
+     jobs it has met. Rejoining after a reload is not — that player is in the
+     middle of a round and does not need telling again.
+
+     This was not obvious. 260909.17 looked like it had lost the card
+     entirely, when in fact both roles had been marked seen during the
+     previous build's testing and the phone was correctly saying nothing. */
+  function clearRoles(){
+    ["builder","architect"].forEach(function(r){
+      try { localStorage.removeItem("relay.m.role." + r); } catch(e){}
+    });
+  }
+  function rolesSeen(){
+    return ["builder","architect"].filter(seenRole);
+  }
   var ROLECARDS = {
     builder: { head:"You're a Builder",
       body:"In ADD mode, pick a color below and drag or tap to add cubes to the " +
@@ -2600,8 +2615,9 @@
   }
 
   /* ---------- taking a seat ---------- */
-  function takeSeat(kind, code, name){
+  function takeSeat(kind, code, name, fresh){
     ME = kind; SESS = "";
+    if (fresh) clearRoles();
     saveSeat("m", code, kind, name);
     SHARED.attach(code);
   }
@@ -2617,7 +2633,7 @@
       UI.busy = false;
       if (!res.ok) return say("cErr", res.why);
       say("cErr", "");
-      takeSeat("host", res.code, name);
+      takeSeat("host", res.code, name, true);
     });
   }
   function doJoin(){
@@ -2630,7 +2646,7 @@
       UI.busy = false;
       if (!res.ok) return say("jErr", res.why);
       say("jErr", "");
-      takeSeat("guest", res.code, name);
+      takeSeat("guest", res.code, name, true);
     });
   }
   function say(id, t){ var e = el(id); if (e) e.textContent = t; }
@@ -2677,9 +2693,9 @@
     on("jGo", doJoin);
     on("resumeBtn", function(){
       var seat = loadSeat("m");
-      if (seat && seat.code) takeSeat(seat.kind, seat.code, seat.name);
+      if (seat && seat.code) takeSeat(seat.kind, seat.code, seat.name, false);
     });
-    on("resumeDrop", function(){ clearSeat("m"); paint(); });
+    on("resumeDrop", function(){ clearSeat("m"); clearRoles(); paint(); });
 
     /* the debrief's one button. 260909.9 painted it, disabled it, changed its
        label — and never listened to it. A control that exists and does
@@ -2793,6 +2809,7 @@
       fitZoom:FIT.zoom, fitDrop:FIT.drop, baseFov:BASE_FOV,
       glideLong:GLIDE_LONG, glideLeg:GLIDE_LEG,
       secure:window.isSecureContext, sessions2:SESSION_CODES.length,
+      rolesSeen: rolesSeen,
       viewNow: function(){
         return { want:VIEW, got:VIEWERS.map(function(V){ return V.viewIx; }),
                  label:(el("plView")||{}).textContent };
