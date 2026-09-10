@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.5</title>
+<title>Relay mobile touch testbed 260909.6</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -113,14 +113,14 @@
   }
   footer #mFoot{ flex:1 1 auto; }
 
-  /* testbed only: the framing strip does not exist in the real game */
+  /* testbed only: the model switch does not exist in the real game */
   #fitBar{
     flex:0 0 auto; display:flex; align-items:center; gap:6px;
     padding:6px 12px 0; color:var(--dim);
     font-size:calc(11px * var(--ts)); white-space:nowrap;
   }
   #fitBar .lbl{ font-weight:700; letter-spacing:.08em; }
-  #fitBar #mFit{ margin-left:auto; }
+  #fitBar #mModelNote{ overflow:hidden; text-overflow:ellipsis; }
   button.tiny{
     appearance:none; border:1px solid var(--rule); border-radius:8px;
     background:var(--raise); color:var(--paper);
@@ -159,8 +159,13 @@
 </div>
 
 <div id="builderBar">
-  <div class="seg" style="width:100%">
-    <button id="tPlace" class="on" style="flex:1">ADD</button>
+  <div class="seg" id="rowFree" style="width:100%">
+    <button id="tAdd" class="on" style="flex:1">ADD</button>
+    <button id="tErase2" style="flex:1">REMOVE</button>
+  </div>
+  <div class="seg" id="rowModes" style="width:100%; display:none">
+    <button id="tPlace" class="on" style="flex:1">STACK</button>
+    <button id="tSide" style="flex:1">SIDE</button>
     <button id="tErase" style="flex:1">REMOVE</button>
   </div>
   <div id="swatches">
@@ -183,12 +188,8 @@
 <div id="carry"></div>
 
 <div id="fitBar">
-  <span class="lbl">fit</span>
-  <button class="tiny" id="fBig">BIGGER</button>
-  <button class="tiny" id="fSmall">SMALLER</button>
-  <button class="tiny" id="fDown">DOWN</button>
-  <button class="tiny" id="fUp">UP</button>
-  <span id="mFit"></span>
+  <button class="tiny" id="bModel">MODEL B · free</button>
+  <span id="mModelNote"></span>
 </div>
 
 <footer>
@@ -612,69 +613,71 @@
   /* ==========================================================
      MOBILE DESIGN SET (provisional)
      The four families from library-260906 that are already
-     column-only, translated into the 4x4 plate. 20 designs, no
-     face marks. Replaced once the real mobile set is authored.
+     buildable on a 4x4 plate, translated onto it. 20 designs, no
+     face marks. Every one happens to be column-only, which is
+     still legal under the grounded rule; the authored set will
+     use overhangs. Replaced once the real set arrives.
      ========================================================== */
   var MDESIGNS = [
     { id:"d-cimve9", family:"d-cimve9", name:"lowboy", tier:"2E",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"y",0],[1,0,2,"b",0],[1,0,1,"y",0],[1,0,0,"y",0],[1,1,1,"b",0]] },
     { id:"d-y39dgp", family:"d-cimve9", name:"lowboy v2", tier:"2E",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"y",0],[0,0,1,"o",0],[1,0,1,"y",0],[2,0,1,"y",0],[1,1,1,"o",0]] },
     { id:"d-amvn08", family:"d-cimve9", name:"lowboy v3", tier:"2E",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"o",0],[1,0,2,"y",0],[1,0,1,"o",0],[1,0,0,"o",0],[1,1,1,"y",0]] },
     { id:"d-ukjken", family:"d-cimve9", name:"lowboy v4", tier:"2E",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,2,"o",0],[2,0,1,"b",0],[1,0,1,"o",0],[0,0,1,"o",0],[1,1,1,"b",0]] },
     { id:"d-xwyto1", family:"d-cimve9", name:"lowboy v5", tier:"2E",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"y",0],[0,0,2,"b",0],[1,0,2,"y",0],[2,0,2,"y",0],[1,1,2,"b",0]] },
     { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"p",0],[1,0,1,"b",0],[2,0,1,"p",0],[2,0,2,"p",0],[0,1,1,"b",0]] },
     { id:"d-f5fg4s", family:"d-coxziw", name:"welcome v2", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"b",0],[2,0,1,"y",0],[2,0,0,"b",0],[1,0,0,"b",0],[2,1,2,"y",0]] },
     { id:"d-7yje46", family:"d-coxziw", name:"welcome v3", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"p",0],[1,0,1,"y",0],[0,0,1,"p",0],[0,0,2,"p",0],[2,1,1,"y",0]] },
     { id:"d-m788w1", family:"d-coxziw", name:"welcome v4", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"p",0],[2,0,1,"y",0],[2,0,2,"p",0],[1,0,2,"p",0],[2,1,0,"y",0]] },
     { id:"d-su6uto", family:"d-coxziw", name:"welcome v5", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,2,"b",0],[1,0,2,"o",0],[2,0,2,"b",0],[2,0,1,"b",0],[0,1,2,"o",0]] },
     { id:"d-9uifid", family:"d-9uifid", name:"jetty", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[1,0,2,"p",0],[2,0,2,"p",0],[0,1,1,"p",0]] },
     { id:"d-r8k08j", family:"d-9uifid", name:"jetty v2", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[1,0,1,"p",0],[1,0,2,"p",0],[2,1,0,"p",0]] },
     { id:"d-3chiv8", family:"d-9uifid", name:"jetty v3", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"o",0],[1,0,2,"o",0],[1,0,1,"b",0],[0,0,1,"b",0],[2,1,2,"b",0]] },
     { id:"d-1a0eb8", family:"d-9uifid", name:"jetty v4", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"p",0],[1,0,1,"p",0],[1,0,2,"o",0],[0,0,2,"o",0],[2,1,1,"o",0]] },
     { id:"d-c1yf6d", family:"d-9uifid", name:"jetty v5", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"b",0],[2,0,1,"b",0],[1,0,1,"p",0],[1,0,0,"p",0],[2,1,2,"p",0]] },
     { id:"d-eh011t", family:"d-eh011t", name:"ledge", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[2,0,1,"b",0],[2,0,2,"y",0],[1,1,1,"y",0],[2,1,1,"y",0]] },
     { id:"d-6rgqsr", family:"d-eh011t", name:"ledge v2", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[2,0,2,"y",0],[1,0,2,"o",0],[2,1,1,"o",0],[2,1,2,"o",0]] },
     { id:"d-83ptoe", family:"d-eh011t", name:"ledge v3", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"y",0],[1,0,2,"y",0],[0,0,2,"y",0],[0,0,1,"p",0],[1,1,2,"p",0],[0,1,2,"p",0]] },
     { id:"d-3rwav2", family:"d-eh011t", name:"ledge v4", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"o",0],[1,0,1,"o",0],[0,0,1,"o",0],[0,0,2,"p",0],[1,1,1,"p",0],[0,1,1,"p",0]] },
     { id:"d-2x3u62", family:"d-eh011t", name:"ledge v5", tier:"1",
-      glyphs:"none", faces:"top", rule:"stacked",
+      glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"y",0],[2,0,1,"y",0],[2,0,0,"y",0],[1,0,0,"b",0],[2,1,1,"b",0],[2,1,0,"b",0]] }
   ];
   /* ==========================================================
@@ -794,16 +797,29 @@
     return bits.length ? bits.join(" \u00b7 ") : "Nothing out of place.";
   }
   /* ==========================================================
-     M0. THE COLUMN MODEL
-     The whole placement rule for the phone, and the reason the
-     mobile designs may have no overhangs. A gesture names a
-     COLUMN, never a cell in space. A cube lands on top of that
-     column; only the top cube of a column can be taken off. There
-     is no depth for a finger to get wrong.
+     M0. THE PLACEMENT MODELS
+     The rule is GROUNDED, the same as the laptop game: a cube may
+     hang off the side of another as long as the whole thing still
+     connects to the plate. What differs between the two models
+     below is not what is legal, but how a finger says which cell
+     it means.
+
+     B, "free": the laptop's own model. The ray hits a face and the
+     cube goes on the outside of it. One rule, no modes. The cost
+     is that a top face is only 21-28px deep on a phone, so
+     stacking depends on a small target.
+
+     C, "stack + side": STACK names a COLUMN, which is a 76px
+     target and cannot be missed, and SIDE attaches to a cube's
+     side face, which is the larger of the two face types at
+     37-51px. Two modes, but neither action has a small target.
 
      Pure, and above anything that touches the DOM, so it runs in
      node against the shipped file the way sections 1-11 do.
      ========================================================== */
+
+  /* the rule both models validate against */
+  var MRULE = "grounded";
 
   /* the highest cube in a column, and where it sits in the list */
   function topOf(build, col){
@@ -816,25 +832,44 @@
   }
 
   /* what a gesture over this column would do, or null for nothing */
+  /* model C, STACK: a cube lands on top of whatever is in this column */
   function targetFor(build, tool, col){
     if (!col) return null;
     var t = topOf(build, col);
     if (tool === "erase")
       return t.i < 0 ? null : { kind:"cube", i:t.i, x:col.x, z:col.z };
     var y = t.y + 1;
-    /* stacked, not grounded: the rule and the gesture have to agree, or the
-       preview will offer a placement the model then refuses */
-    if (!canPlace(build, "stacked", col.x, y, col.z)) return null;
+    if (!canPlace(build, MRULE, col.x, y, col.z)) return null;
     return { kind:"cell", x:col.x, y:y, z:col.z };
+  }
+
+  /* model C, SIDE: only a cell that is attached to the side of something.
+     The mode says "put this on the side of that", so a placement whose only
+     support is the cube underneath it belongs to STACK, not here. */
+  function isSideCell(build, p){
+    if (!p || p.kind !== "cell") return false;
+    var m = mapOf(build);
+    for (var d = 0; d < 6; d++){
+      if (DIRS[d][1] !== 0) continue;                   // horizontal only
+      if (m[key(p.x + DIRS[d][0], p.y, p.z + DIRS[d][2])] !== undefined) return true;
+    }
+    return false;
+  }
+  function sideOnly(build, p){ return isSideCell(build, p) ? p : null; }
+
+  /* taking a cube away, and everything that was only standing on it */
+  function removeAt(build, i){
+    var dm = doomed(build, MRULE, i);
+    if (dm === null) return build;
+    var go = {}; dm.forEach(function(k){ go[k] = 1; });
+    return build.filter(function(_, k){ return !go[k]; });
   }
 
   /* carrying it out. Returns a new list; the caller never mutates in place */
   function applyTarget(build, t, colour){
-    if (!t) return build;
-    var out = build.slice();
-    if (t.kind === "cube") out.splice(t.i, 1);
-    else out.push({ x:t.x, y:t.y, z:t.z, c:colour, fixed:false, o:0 });
-    return out;
+    if (!t || t.kind === "empty") return build;
+    if (t.kind === "cube") return removeAt(build, t.i);
+    return build.concat([{ x:t.x, y:t.y, z:t.z, c:colour, fixed:false, o:0 }]);
   }
 
   /* ---------- where a gesture is actually pointing ---------- */
@@ -1053,6 +1088,75 @@
     VIEWERS.push(V);
     return V;
   }
+
+  /* ---- picking and ghost preview, copied verbatim from relay-260908.7 ----
+     This is the laptop game's placement: the ray hits a face and the cube
+     goes on the outside of it. It also computes the deletion cascade, so a
+     press in REMOVE mode can show everything that is about to go. Nothing
+     here is mobile-specific; the mobile layer feeds it an aim point and the
+     grounded rule. */
+  var ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function pickIn(V, ev, cubes, rule, tool, handOri, colour){
+    var r = V.canvas.getBoundingClientRect();
+    ndc.x = ((ev.clientX-r.left)/r.width)*2-1;
+    ndc.y = -((ev.clientY-r.top)/r.height)*2+1;
+    ray.setFromCamera(ndc, V.cam);
+    var targets = [V.plateHit], i;
+    for (i=0;i<V.group.children.length;i++){
+      var b = V.group.children[i].userData.body;
+      if (b) targets.push(b);
+    }
+    var hits = ray.intersectObjects(targets, false);
+    if (!hits.length) return null;
+    var hit = hits[0];
+    if (hit.object === V.plateHit){
+      if (tool !== "place") return { kind:"empty" };
+      var px = Math.floor(hit.point.x), pz = Math.floor(hit.point.z);
+      if (!canPlace(cubes, rule, px, 0, pz)) return null;
+      return { kind:"cell", x:px, y:0, z:pz };
+    }
+    var owner = hit.object.parent.userData.cube;
+    var oi = -1;
+    for (i=0;i<cubes.length;i++) if (cubes[i] === owner) oi = i;
+    if (oi < 0) return null;
+    if (tool !== "place") return { kind:"cube", i:oi };
+    var n = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
+    var nd = 0;
+    for (var d=0;d<6;d++)
+      if (DIRS[d][0]===Math.round(n.x) && DIRS[d][1]===Math.round(n.y) &&
+          DIRS[d][2]===Math.round(n.z)) nd = d;
+    var t = { x:owner.x+DIRS[nd][0], y:owner.y+DIRS[nd][1], z:owner.z+DIRS[nd][2] };
+    if (!canPlace(cubes, rule, t.x, t.y, t.z)) return null;
+    return { kind:"cell", x:t.x, y:t.y, z:t.z };
+  }
+  function showGhostIn(V, p, cubes, rule, tool, handOri, colour, famk){
+    var ghost = V.ghost;
+    while (ghost.children.length) ghost.remove(ghost.children[0]);
+    if (!p || p.kind === "empty"){ ghost.visible = false; return; }
+    ghost.visible = true;
+    if (p.kind === "cube"){
+      var col = tool === "erase" ? 0xD6453F : 0x4FB6C8;
+      var list = [p.i];
+      if (tool === "erase"){
+        var dm = doomed(cubes, rule, p.i);
+        list = dm === null ? [] : dm;
+      }
+      for (var k=0;k<list.length;k++){
+        var q = cubes[list[k]];
+        var m = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({
+          color:col, transparent:true, opacity:0.26, depthWrite:false }));
+        m.position.set(q.x+0.5, q.y+0.5, q.z+0.5); m.scale.setScalar(1.05);
+        ghost.add(m);
+        var l = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color:col }));
+        l.position.copy(m.position); l.scale.setScalar(1.05);
+        ghost.add(l);
+      }
+      return;
+    }
+    var gc = makeCube({ x:p.x, y:p.y, z:p.z, c:colour, fixed:false, o:handOri }, famk,
+                      { faint:0.55 });
+    ghost.add(gc);
+  }
   /* ==========================================================
      M1. THE TESTBED ITSELF
      Everything above this line is copied out of relay-260908.7,
@@ -1060,11 +1164,13 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.5";
+  var STAMP = "260909.6";
 
   var M = {
     ix: 0,               // which design we are looking at
-    tool: "place",       // place | erase
+    tool: "place",       // place | side | erase
+    model: "free",       // free (B) | modes (C)
+    lastAdd: "place",
     colour: "y",
     build: [],
     gesture: "press",    // press | tap
@@ -1128,34 +1234,41 @@
   }
 
 
+  /* ---------- what this gesture would do ---------- */
+  /* Both models are fed the same aim point. B hands the whole job to the
+     laptop's own picker; C keeps the column for stacking and uses the picker
+     only for side attachment. REMOVE is the picker in either model, because
+     any cube may be chosen, not just a column top. */
+  function mTarget(ev){
+    var a = aim(ev), pt = { clientX:a.x, clientY:a.y };
+    if (M.tool === "erase")
+      return pickIn(BV, pt, M.build, MRULE, "erase", 0, M.colour);
+    if (M.model === "free")
+      return pickIn(BV, pt, M.build, MRULE, "place", 0, M.colour);
+    if (M.tool === "side")
+      return sideOnly(M.build, pickIn(BV, pt, M.build, MRULE, "place", 0, M.colour));
+    return targetFor(M.build, "place", columnAt(BV, a.x, a.y));
+  }
+
   /* ---------- the preview ---------- */
-  function showTarget(V, t){
-    var g = V.ghost;
-    while (g.children.length) g.remove(g.children[0]);
-    if (!t){ g.visible = false; return; }
-    g.visible = true;
-    var col = t.kind === "cube" ? 0xD6453F : 0x4FB6C8;
-    /* a pad on the baseplate, so the column is legible even when the cube
-       itself is high up and behind a finger */
+  /* a pad on the baseplate under the target, so the cell is locatable even
+     when the cube itself is floating high up behind a finger */
+  function padAt(x, z, col){
     var pad = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.94),
       new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.38,
                                     depthWrite:false, side:THREE.DoubleSide }));
     pad.rotation.x = -Math.PI/2;
-    pad.position.set(t.x + 0.5, 0.014, t.z + 0.5);
-    g.add(pad);
-    if (t.kind === "cube"){
-      var q = M.build[t.i];
-      var m = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({
-        color:col, transparent:true, opacity:0.30, depthWrite:false }));
-      m.position.set(q.x + 0.5, q.y + 0.5, q.z + 0.5); m.scale.setScalar(1.06);
-      g.add(m);
-      var l = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color:col }));
-      l.position.copy(m.position); l.scale.setScalar(1.06);
-      g.add(l);
-    } else {
-      g.add(makeCube({ x:t.x, y:t.y, z:t.z, c:M.colour, fixed:false, o:0 },
-                     "none", { faint:0.55 }));
-    }
+    pad.position.set(x + 0.5, 0.014, z + 0.5);
+    return pad;
+  }
+  function showTarget(V, t){
+    /* the red cascade for a removal is the copied code's own work */
+    showGhostIn(V, t, M.build, MRULE,
+                M.tool === "erase" ? "erase" : "place", 0, M.colour, "none");
+    if (!t) return;
+    if (t.kind === "cell") V.ghost.add(padAt(t.x, t.z, 0x4FB6C8));
+    if (t.kind === "cube" && M.build[t.i])
+      V.ghost.add(padAt(M.build[t.i].x, M.build[t.i].z, 0xD6453F));
   }
 
   function commit(t){
@@ -1212,19 +1325,19 @@
     if (swatch){
       M.colour = swatch;
       /* picking up a cube means you intend to put one down */
-      if (M.tool === "erase"){ M.tool = "place"; paintTool(); }
+      if (M.tool === "erase"){ M.tool = M.lastAdd; paintTool(); }
       paintSwatches();
     }
     if (M.pane !== "build") return;
     if (M.gesture === "tap"){
       G.fromSwatch = false;
-      if (!swatch) commit(targetFor(M.build, M.tool, columnAt(BV, ev.clientX, ev.clientY)));
+      if (!swatch) commit(mTarget(ev));
       return;
     }
     G.on = true;
     G.fromSwatch = !!swatch;              // set before any aim is taken
     G.overStage = inStage(ev);
-    G.t = targetFor(M.build, M.tool, columnAt(BV, aim(ev).x, aim(ev).y));
+    G.t = mTarget(ev);
     showTarget(BV, G.t);
     if (G.fromSwatch){ carryShow(M.colour); carryMoveTo(ev.clientX, ev.clientY); }
     carryUpdate();
@@ -1232,7 +1345,7 @@
   function gmove(ev){
     if (!G.on) return;
     if (inStage(ev)) G.overStage = true;
-    G.t = targetFor(M.build, M.tool, columnAt(BV, aim(ev).x, aim(ev).y));
+    G.t = mTarget(ev);
     showTarget(BV, G.t);
     if (G.fromSwatch) carryMoveTo(ev.clientX, ev.clientY);
     carryUpdate();
@@ -1266,9 +1379,26 @@
     });
   }
   function paintTool(){
-    el("tPlace").classList.toggle("on", M.tool === "place");
-    el("tErase").classList.toggle("on", M.tool === "erase");
+    ["tPlace","tSide","tErase","tAdd","tErase2"].forEach(function(id){
+      var b = el(id); if (b) b.classList.toggle("on", false);
+    });
+    if (M.model === "free"){
+      el("tAdd").classList.toggle("on", M.tool !== "erase");
+      el("tErase2").classList.toggle("on", M.tool === "erase");
+    } else {
+      el("tPlace").classList.toggle("on", M.tool === "place");
+      el("tSide").classList.toggle("on", M.tool === "side");
+      el("tErase").classList.toggle("on", M.tool === "erase");
+    }
+    if (M.tool !== "erase") M.lastAdd = M.tool;
     paintSwatches();
+  }
+  function paintModel(){
+    el("rowFree").style.display  = M.model === "free"  ? "flex" : "none";
+    el("rowModes").style.display = M.model === "modes" ? "flex" : "none";
+    el("bModel").textContent = M.model === "free" ? "MODEL B · free" : "MODEL C · stack+side";
+    el("mModelNote").textContent = M.model === "free"
+      ? "aim at any face" : "STACK aims a column · SIDE aims a side face";
   }
   function paintPane(){
     el("paneBuild").classList.toggle("on", M.pane === "build");
@@ -1281,6 +1411,7 @@
     el("mFoot").textContent =
       GRID + "x" + GRID + "x" + MAXY +
       " · " + M.taps + " placed · " + M.misfires + " missed" +
+      " · " + MRULE +
       " · motion " + (MOTION_REDUCED ? "reduced" : "full") +
       " · " + STAMP;
   }
@@ -1293,7 +1424,7 @@
      instead of estimated from here; the winning pair gets baked into the game
      and the control disappears. */
   var ORBIT0 = ORBIT, LIFT0 = LIFT, CY0 = CENTRE.y;
-  var FIT = { zoom:0.92, drop:0.55 };
+  var FIT = { zoom:0.92, drop:0.55 };   // settled on two phones, 9 Sep
   function refit(){
     FIT.zoom = Math.max(0.68, Math.min(1.25, FIT.zoom));
     FIT.drop = Math.max(-0.60, Math.min(1.80, FIT.drop));
@@ -1302,8 +1433,6 @@
     CENTRE.y = CY0 + FIT.drop;
     VIEWERS.forEach(function(V){ V.snapTo(V.viewIx); });
     if (window.RELAY_M){ window.RELAY_M.fitZoom = FIT.zoom; window.RELAY_M.fitDrop = FIT.drop; }
-    var r = el("mFit");
-    if (r) r.textContent = "size " + FIT.zoom.toFixed(2) + " · drop " + FIT.drop.toFixed(2);
   }
 
   /* ---------- a swatch is a cube, not a square ---------- */
@@ -1392,8 +1521,11 @@
 
     on("paneBuild",  function(){ M.pane = "build";  paintPane(); });
     on("paneDesign", function(){ M.pane = "design"; paintPane(); });
-    on("tPlace", function(){ M.tool = "place"; paintTool(); });
-    on("tErase", function(){ M.tool = "erase"; paintTool(); });
+    on("tPlace",  function(){ M.tool = "place"; paintTool(); });
+    on("tSide",   function(){ M.tool = "side";  paintTool(); });
+    on("tErase",  function(){ M.tool = "erase"; paintTool(); });
+    on("tAdd",    function(){ M.tool = "place"; paintTool(); });
+    on("tErase2", function(){ M.tool = "erase"; paintTool(); });
 
     CKEYS.forEach(function(k){
       var b = el("sw-" + k);
@@ -1442,11 +1574,12 @@
     });
     on("bTheme", function(){ theme(M.theme === "light" ? "dark" : "light"); });
 
-    /* testbed only: find the framing on a real screen */
-    on("fBig",  function(){ FIT.zoom -= 0.04; refit(); });   // closer camera, bigger build
-    on("fSmall",function(){ FIT.zoom += 0.04; refit(); });
-    on("fDown", function(){ FIT.drop += 0.15; refit(); });
-    on("fUp",   function(){ FIT.drop -= 0.15; refit(); });
+    /* testbed only: switch between the two placement models */
+    on("bModel", function(){
+      M.model = M.model === "free" ? "modes" : "free";
+      M.tool = "place"; M.lastAdd = "place";
+      paintModel(); paintTool(); showTarget(BV, null);
+    });
 
     /* a readable record of what the phone decided, for the console and for
        test-m-logic, which cannot see inside this closure otherwise */
@@ -1454,10 +1587,11 @@
                        motionReduced:MOTION_REDUCED, glideLong:GLIDE_LONG,
                        glideLeg:GLIDE_LEG, skipsGlide:reduceMotion, turnMs:TURN_MS, carryLift:CARRY_LIFT,
                        designs:MLIB.length, secure:window.isSecureContext,
-                       fitZoom:FIT.zoom, fitDrop:FIT.drop };
+                       fitZoom:FIT.zoom, fitDrop:FIT.drop,
+                       rule:MRULE, model:M.model };
     theme("light");
     refit();
-    paintTool(); paintPane(); paint();
+    paintModel(); paintTool(); paintPane(); paint();
     keepAwake();
 
     /* never let one throw stop the loop — brief §10 */
