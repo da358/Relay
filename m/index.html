@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.13</title>
+<title>Relay 260909.14</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -350,7 +350,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.13";
+  var VERSION = "260909.14";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -776,8 +776,6 @@
 
   /* ==========================================================
      MOBILE OVERRIDE — the only edit to the copied logic above.
-     A phone gets a 4x4 plate four cubes high. Section 13 below
-     derives its camera distance from GRID, so this comes first.
      ========================================================== */
   GRID = 4; MAXY = 4;
 
@@ -1594,7 +1592,7 @@
      gate that waits for both cannot be closed by whoever writes last. */
   function blankState(){
     return { rev:0, team:null, phase:"landing", lobby:null, round:null,
-             done:0, used:[] };
+             done:0, used:[], phaseAt:0 };
   }
   function J(v){ return JSON.stringify(v === undefined ? null : v); }
   function JP(t, dflt){
@@ -1608,6 +1606,10 @@
   function encWire(s){
     var w = {
       phase: s.phase || "landing",
+      /* when this phase began. Nobody in the game reads it; it is here so the
+         facilitator can see at a glance which pair has been stuck in a lobby
+         for four minutes. */
+      phaseAt: s.phaseAt || 0,
       done: s.done || 0,
       used: J(s.used || []),
       team: J(s.team),
@@ -1631,7 +1633,12 @@
         submitted: r.submitted ? 1 : 0,
         asked: r.asked ? 1 : 0,
         guestOk: r.guestOk ? 1 : 0,
-        endedBy: r.endedBy || ""
+        endedBy: r.endedBy || "",
+        /* "confirmed" when the Architect locked in a submitted build,
+           "ended" when someone pressed END. The two look identical from the
+           outside once the Builder has submitted, so it is recorded rather
+           than inferred. */
+        endedHow: r.endedHow || ""
       };
     }
     return w;
@@ -1639,6 +1646,7 @@
   function decWire(w){
     var s = blankState();
     s.phase = w.phase || "landing";
+    s.phaseAt = w.phaseAt || 0;
     s.done  = w.done || 0;
     s.used  = JP(w.used, []);
     s.team  = JP(w.team, null);
@@ -1660,7 +1668,8 @@
         submitted: !!r.submitted,
         asked: !!r.asked,
         guestOk: !!r.guestOk,
-        endedBy: r.endedBy || null
+        endedBy: r.endedBy || null,
+        endedHow: r.endedHow || null
       };
     }
     return s;
@@ -1670,7 +1679,7 @@
     return { rev:0,
       team: { code:code, id:"t-" + Math.random().toString(36).slice(2, 8),
               session:sess, host:{ name:name }, guest:null },
-      phase:"lobby",
+      phase:"lobby", phaseAt: NOW(),
       lobby: { hostRole:null, readyHost:false, readyGuest:false },
       round:null, done:0, used:[] };
   }
@@ -1998,10 +2007,11 @@
         hostRole: st.lobby.hostRole,
         names: { host: t.host.name, guest: (t.guest && t.guest.name) || "" },
         startedAt: NOW(), endedAt: null, elapsedMs: null,
-        build: null, submitted: false, asked: false, guestOk: false, endedBy: null
+        build: null, submitted: false, asked: false, guestOk: false,
+        endedBy: null, endedHow: null
       };
       st.used = (st.used || []).concat([d.family]);
-      st.phase = "play";
+      st.phase = "play"; st.phaseAt = NOW();
     });
   }
 
@@ -2027,16 +2037,17 @@
       SHARED.write(function(st){ if (st.round) st.round.submitted = false; });
       return;
     }
-    endRound("architect");
+    endRound("architect", "confirmed");
   }
-  function endRound(by){
+  function endRound(by, how){
     var s = S(); if (!s.round || s.phase !== "play") return;
     var ms = NOW() - (s.round.startedAt || NOW());
     SHARED.write(function(st){
       st.round.endedAt = NOW();
       st.round.elapsedMs = ms;
       st.round.endedBy = by;
-      st.phase = "debrief";
+      st.round.endedHow = how || "ended";
+      st.phase = "debrief"; st.phaseAt = NOW();
     });
     if (ME === "host") saveRound();
   }
@@ -2062,7 +2073,7 @@
     SHARED.write(function(st){
       st.done = (st.done || 0) + 1;
       st.round = null;
-      st.phase = "lobby";
+      st.phase = "lobby"; st.phaseAt = NOW();
       st.lobby = { hostRole: st.lobby ? st.lobby.hostRole : null,
                    readyHost:false, readyGuest:false };
     });
@@ -2082,7 +2093,8 @@
              players:{ host:r.names.host, guest:r.names.guest } },
       round:{ id:r.id, n:r.n, tier:r.tier, designId:r.designId,
               hostRole:r.hostRole, startedAt:r.startedAt, endedAt:r.endedAt,
-              elapsedMs:r.elapsedMs, endedBy:r.endedBy },
+              elapsedMs:r.elapsedMs, endedBy:r.endedBy,
+              endedHow:r.endedHow || "confirmed" },
       result:{ verdict:v, submitted:!!r.submitted, cubes:b.length,
                designCubes:d.cubes.length,
                extra:df.extra, missing:df.missing, color:df.color,
@@ -2636,7 +2648,7 @@
       b.classList.toggle("armed", !!armed);
     }
     on("plEnd", function(){
-      if (Date.now() - endArmed < 3000){ endArmed = 0; endLabel(false); endRound(ME); return; }
+      if (Date.now() - endArmed < 3000){ endArmed = 0; endLabel(false); endRound(ME, "ended"); return; }
       endArmed = Date.now();
       endLabel(true);
       setTimeout(function(){

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relay mobile facilitator view 260909.1</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  /* The game's own tokens. This is a companion to it, not a separate product,
+     and a facilitator glancing between the two should not have to re-learn
+     what a colour means. */
+  :root{
+    --ink:#0E141B; --panel:#151D26; --panel-2:#1B2530; --rule:#26333F;
+    --graphite:#8A9AAB; --paper:#E6EDF3; --amber:#E8A33D; --cyan:#4FB6C8;
+    --green:#4FA557; --red:#D6453F; --violet:#9B8CE0;
+    --bg:#070B0F; --headbg:var(--ink); --failtext:#F0A7A3;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* set by the density control */
+    --rowpad:9px; --gap:26px;
+    /* every declared text size is a multiple of this */
+    --ts:1;
+    /* measured, because the sticky column headings sit below the bar and the
+       bar's own height changes with the text size */
+    --headh:57px;
+  }
+
+  /* Dark text on white. Not an inversion: the accent colours that carry status
+     were chosen for a dark ground and are far too pale on white, so each has a
+     darker counterpart here. The greys are re-picked rather than flipped, so
+     secondary text stays legibly secondary instead of becoming faint grey on
+     white. */
+  :root[data-theme="light"]{
+    --bg:#FFFFFF; --ink:#F4F7FA; --headbg:#F4F7FA;
+    --panel:#EFF3F7; --panel-2:#E4EBF1; --rule:#C7D2DC;
+    --graphite:#54626F; --paper:#0F1519;
+    --amber:#8A5A05; --cyan:#0B6A7A; --green:#256E2A; --red:#A8221B;
+    --violet:#4F3FB8; --failtext:#A8221B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--paper); font-family:var(--sans);
+       -webkit-font-smoothing:antialiased; font-size:calc(15px * var(--ts)); line-height:1.45}
+
+  /* ---------- the bar that stays put ---------- */
+  header{position:sticky; top:0; z-index:10; background:var(--headbg);
+         border-bottom:1px solid var(--rule); padding:12px 20px}
+  .barrow{display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+          max-width:1180px; margin:0 auto}
+  h1{margin:0; font-size:calc(16px * var(--ts)); font-weight:650; letter-spacing:.01em; white-space:nowrap}
+  h1 em{font-style:normal; color:var(--graphite); font-weight:400; font-size:calc(13px * var(--ts))}
+  .readonly{font-family:var(--mono); font-size:calc(11px * var(--ts)); color:var(--graphite);
+            border:1px solid var(--rule); border-radius:3px; padding:2px 7px}
+  .spacer{flex:1 1 auto}
+
+  label.field{display:flex; align-items:center; gap:8px; font-size:calc(13px * var(--ts)); color:var(--graphite)}
+  input#sess{font-family:var(--mono); font-size:calc(15px * var(--ts)); letter-spacing:.14em;
+             text-transform:uppercase; width:9ch; background:var(--panel);
+             color:var(--paper); border:1px solid var(--rule); border-radius:3px;
+             padding:6px 9px}
+  input#sess:focus{outline:2px solid var(--cyan); outline-offset:1px}
+  .btn{font-family:var(--mono); font-size:calc(12px * var(--ts)); letter-spacing:.1em;
+       text-transform:uppercase; background:var(--panel); color:var(--paper);
+       border:1px solid var(--rule); border-radius:3px; padding:6px 11px;
+       cursor:pointer}
+  .btn:hover{border-color:var(--graphite)}
+  /* the label sits on the accent, so it takes the page's own ground colour:
+     dark on bright cyan in the dark palette, white on deep cyan in the light */
+  .btn.on{background:var(--cyan); border-color:var(--cyan); color:var(--bg); font-weight:650}
+  .btn:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
+  .btn:disabled{opacity:.35; cursor:default}
+  .btn:disabled:hover{border-color:var(--rule)}
+  .netstate{font-family:var(--mono); font-size:calc(11px * var(--ts)); color:var(--green)}
+  .netstate.off{color:var(--amber)}
+
+  /* ---------- the glance ---------- */
+  main{max-width:1180px; margin:0 auto; padding:0 20px 80px}
+  .glance{padding:22px 0 6px; font-size:calc(22px * var(--ts)); font-weight:400; line-height:1.35;
+          color:var(--graphite)}
+  .glance b{color:var(--paper); font-weight:650; font-variant-numeric:tabular-nums}
+  .glance .live{color:var(--cyan)}
+
+  section{margin-top:var(--gap)}
+  h2{margin:0 0 3px; font-size:calc(15px * var(--ts)); font-weight:650}
+  h2 span{color:var(--graphite); font-weight:400}
+  .subhead{margin:0 0 9px; font-size:calc(13px * var(--ts)); color:var(--graphite)}
+
+  table{width:100%; border-collapse:collapse; font-size:calc(14px * var(--ts))}
+  caption{caption-side:top; text-align:left}
+  th,td{text-align:left; padding:var(--rowpad) 11px; border-bottom:1px solid var(--rule);
+        vertical-align:baseline}
+  thead th{font-family:var(--mono); font-size:calc(11px * var(--ts)); letter-spacing:.09em;
+           color:var(--graphite); font-weight:400; border-bottom:1px solid var(--graphite);
+           white-space:nowrap; cursor:pointer; user-select:none;
+           position:sticky; top:var(--headh); background:var(--bg)}
+  thead th:hover{color:var(--paper)}
+  thead th[aria-sort]{color:var(--paper)}
+  thead th .arrow{color:var(--cyan)}
+  tbody tr:hover{background:var(--panel)}
+  td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+  td.code{font-family:var(--mono); letter-spacing:.1em; white-space:nowrap}
+  td.dim{color:var(--graphite)}
+  .pill{display:inline-block; font-family:var(--mono); font-size:calc(11px * var(--ts));
+        letter-spacing:.06em; border:1px solid var(--rule); border-radius:9px;
+        padding:1px 9px; white-space:nowrap}
+  .pill.live{border-color:var(--cyan); color:var(--cyan)}
+  .pill.done{border-color:var(--rule); color:var(--graphite)}
+  .pill.lobby{border-color:var(--amber); color:var(--amber)}
+  .score{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .score.good{color:var(--green)}
+  .score.none{color:var(--graphite)}
+  .empty{padding:14px 11px; color:var(--graphite); font-size:calc(14px * var(--ts));
+         border-bottom:1px solid var(--rule)}
+  .fail{margin:22px 0; padding:14px 16px; border:1px solid var(--red);
+        border-left-width:3px; border-radius:3px; color:var(--failtext); font-size:calc(14px * var(--ts))}
+  .fail code{font-family:var(--mono); font-size:calc(13px * var(--ts)); color:var(--paper)}
+  footer{max-width:1180px; margin:0 auto; padding:0 20px 40px;
+         color:var(--graphite); font-size:calc(13px * var(--ts))}
+  /* ---------- added for the phone game's view ---------- */
+  /* Something that has run too long. Bold and red, not a new colour: this is
+     the only thing on the page that is trying to catch an eye across a room. */
+  .over{ color:var(--red); font-weight:700; }
+
+  .tiers{ display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 0; }
+  .tierbox{ border:1px solid var(--rule); border-radius:4px; padding:8px 12px;
+            min-width:150px; }
+  .tierbox b{ display:block; font-family:var(--mono);
+              font-size:calc(11px * var(--ts)); letter-spacing:.09em;
+              color:var(--graphite); font-weight:400; }
+  .tierbox span{ font-variant-numeric:tabular-nums; }
+
+  /* NARROW: a table that cannot fit becomes one card per row. Nothing is cut
+     off and nothing scrolls sideways, which is the whole problem with a table
+     on a phone. */
+  body.narrow table, body.narrow thead{ display:block; }
+  body.narrow thead{ display:none; }
+  body.narrow tbody{ display:block; }
+  body.narrow tbody tr{
+    display:block; border:1px solid var(--rule); border-radius:6px;
+    margin:0 0 10px; padding:4px 2px; background:var(--panel);
+  }
+  body.narrow tbody td{
+    display:flex; justify-content:space-between; gap:14px;
+    border:0; padding:5px 11px; text-align:right;
+  }
+  body.narrow tbody td::before{
+    content:attr(data-h); font-family:var(--mono);
+    font-size:calc(11px * var(--ts)); letter-spacing:.09em;
+    color:var(--graphite); text-align:left; flex:0 0 auto;
+  }
+  body.narrow .glance{ font-size:calc(18px * var(--ts)); }
+  body.narrow main{ padding:0 12px 60px; }
+  body.narrow header{ padding:10px 12px; }
+  body.narrow .tierbox{ min-width:0; flex:1 1 140px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="barrow">
+    <h1>Relay mobile <em>facilitator view 260909.1</em></h1>
+    <span class="readonly">read only</span>
+    <label class="field" for="sess">Session
+      <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
+             aria-label="Session code">
+    </label>
+    <button class="btn" id="bBeloit">Beloit</button>
+    <button class="btn" id="bTest">Test</button>
+    <span class="spacer"></span>
+    <button class="btn" id="bCsv">Copy CSV</button>
+    <button class="btn" id="bWide">Wide</button>
+    <button class="btn" id="bTheme">Light</button>
+    <label class="field">Text
+      <button class="btn" id="tsDown" aria-label="Smaller text">&minus;</button>
+      <button class="btn" id="tsUp" aria-label="Larger text">+</button>
+    </label>
+    <label class="field">Rows
+      <button class="btn" id="dTight">Tight</button>
+      <button class="btn" id="dMed">Medium</button>
+      <button class="btn" id="dWide">Wide</button>
+    </label>
+    <span class="netstate" id="net">connecting</span>
+  </div>
+</header>
+
+<main id="main"></main>
+<footer id="foot"></footer>
+
+<script>
+(function(){
+  "use strict";
+  var VERSION = "260909.1";
+
+  /* ==========================================================
+     1. READING WHAT THE GAME WROTE
+     Two sources. /m/teams holds the live state of every team,
+     which is what the Teams table is. /m/rounds holds one record
+     per finished round, written once by the host and never read
+     back by the game, which is what the Rounds table is.
+
+     Nothing here writes. There is no update, set, transaction or
+     remove anywhere in this file, and a test fails if one appears.
+     ========================================================== */
+  function JP(t, dflt){
+    if (t === undefined || t === null) return dflt;
+    try { var v = JSON.parse(t); return v === null ? dflt : v; }
+    catch(e){ return dflt; }
+  }
+  /* Firebase hands numbered entries back as an array, or as an object keyed
+     "0","1",... depending on how they were written. Read either. */
+  function listOf(v){
+    if (!v) return [];
+    if (Array.isArray(v)) return v.filter(function(x){ return x; });
+    return Object.keys(v).sort(function(a,b){ return Number(a)-Number(b); })
+                 .map(function(k){ return v[k]; });
+  }
+  function dur(ms){
+    if (ms === null || ms === undefined) return "\u2014";
+    var t = Math.max(0, Math.round(ms/1000));
+    return Math.floor(t/60) + ":" + ("0"+(t%60)).slice(-2);
+  }
+  /* a round id carries the moment it was dealt, which is the fallback when a
+     team has been deleted out from under its records */
+  function idTime(id){
+    if (!id || typeof id !== "string") return null;
+    var m = /^r-([0-9a-z]+)$/.exec(id);
+    if (!m) return null;
+    var n = parseInt(m[1], 36);
+    return isFinite(n) && n > 1e12 ? n : null;
+  }
+  var TIERNAME = { E:"easy", M:"medium", H:"hard" };
+
+  /* what a team is doing right now, and for how long */
+  function readTeams(sess){
+    var out = [];
+    Object.keys(TEAMS || {}).forEach(function(code){
+      var t = TEAMS[code] || {}, st = t.state || {};
+      if ((t.session || "") !== sess) return;
+      var team = JP(st.team, null); if (!team) return;
+      var round = (st.round && !st.round.none) ? st.round : null;
+      var phase = st.phase || "lobby";
+      var n = round ? (round.n || 1) : ((st.done || 0) + 1);
+
+      var status, kind;
+      if (!team.guest){ status = "Waiting for a teammate"; kind = "lobby"; }
+      else if (phase === "play"){ status = "Round " + n; kind = "live"; }
+      else if (phase === "debrief"){ status = "Round " + n + " debrief"; kind = "live"; }
+      else { status = "Round " + n + " lobby"; kind = "lobby"; }
+
+      out.push({
+        code: team.code || code,
+        host: (team.host && team.host.name) || "\u2014",
+        guest: (team.guest && team.guest.name) || "\u2014",
+        done: st.done || 0,
+        phase: phase, kind: kind, status: status,
+        tier: round ? (round.tier || "") : "",
+        since: st.phaseAt || 0,
+        build: t.build || "\u2014",
+        createdAt: t.createdAt || 0
+      });
+    });
+    return out;
+  }
+
+  /* every round that finished, from the records the game wrote */
+  function readRounds(sess){
+    var out = [];
+    Object.keys(ROUNDS || {}).forEach(function(key){
+      var r = ROUNDS[key] || {};
+      if ((r.session || "") !== sess) return;
+      var rd = r.round || {}, tm = r.team || {}, res = r.result || {};
+      var started = rd.startedAt || idTime(rd.id) || 0;
+      out.push({
+        key: key,
+        code: tm.code || "\u2014",
+        host: (tm.players && tm.players.host) || "\u2014",
+        guest: (tm.players && tm.players.guest) || "\u2014",
+        n: rd.n || 0,
+        tier: rd.tier || "",
+        tierName: TIERNAME[rd.tier] || "\u2014",
+        designId: rd.designId || "\u2014",
+        how: rd.endedHow === "ended" ? "ended" : "completed",
+        endedBy: rd.endedBy || "",
+        startedAt: started,
+        endedAt: rd.endedAt || (started && rd.elapsedMs ? started + rd.elapsedMs : null),
+        elapsedMs: (rd.elapsedMs === undefined ? null : rd.elapsedMs),
+        verdict: res.verdict || "\u2014",
+        wrong: (res.wrong === undefined ? null : res.wrong),
+        submitted: !!res.submitted
+      });
+    });
+    return out;
+  }
+
+  /* the strip at the top, and the per-tier breakdown under the rounds */
+  function median(xs){
+    if (!xs.length) return null;
+    var a = xs.slice().sort(function(x,y){ return x-y; });
+    var m = Math.floor(a.length/2);
+    return a.length % 2 ? a[m] : Math.round((a[m-1]+a[m])/2);
+  }
+  function summarise(teams, rounds){
+    var done = rounds.filter(function(r){ return r.elapsedMs !== null; });
+    return {
+      teams: teams.length,
+      playing: teams.filter(function(t){ return t.kind === "live"; }).length,
+      rounds: rounds.length,
+      median: median(done.map(function(r){ return r.elapsedMs; })),
+      perfect: rounds.filter(function(r){ return r.verdict === "PERFECT"; }).length
+    };
+  }
+  function byTier(rounds){
+    return ["E","M","H"].map(function(t){
+      var g = rounds.filter(function(r){ return r.tier === t; });
+      var done = g.filter(function(r){ return r.elapsedMs !== null; });
+      return { tier:t, name:TIERNAME[t], n:g.length,
+               median: median(done.map(function(r){ return r.elapsedMs; })),
+               perfect: g.filter(function(r){ return r.verdict === "PERFECT"; }).length };
+    });
+  }
+
+  /* ==========================================================
+     2. THE TABLES
+     ========================================================== */
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+  function clear(n){ while (n.firstChild) n.removeChild(n.firstChild); }
+
+  /* how long a team has been where it is. This is the number the facilitator
+     actually scans for, so it is the only thing on the page allowed to shout. */
+  var LIMITS = { play: 5*60000, lobby: 2*60000, debrief: 3*60000 };
+  function sinceCell(t){
+    if (!t.since) return { text:"\u2014", over:false };
+    var ms = NOW() - t.since;
+    var cap = LIMITS[t.phase] || LIMITS.lobby;
+    return { text: dur(ms), over: ms > cap };
+  }
+
+  var SORT = { teams:{ key:"code", dir:1 }, rounds:{ key:"startedAt", dir:-1 } };
+
+  function table(host, which, cols, rows, empty){
+    var wrap = el("div");
+    var tb = el("table");
+    var thead = el("thead"), tr = el("tr");
+    cols.forEach(function(c){
+      var th = el("th", "", c.head);
+      var s = SORT[which];
+      if (s.key === c.key){
+        th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
+        th.appendChild(el("span", "arrow", s.dir > 0 ? " \u2191" : " \u2193"));
+      }
+      th.onclick = function(){
+        if (s.key === c.key) s.dir = -s.dir; else { s.key = c.key; s.dir = 1; }
+        render();
+      };
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr); tb.appendChild(thead);
+
+    var s = SORT[which];
+    var col = cols.filter(function(c){ return c.key === s.key; })[0] || cols[0];
+    var sorted = rows.slice().sort(function(a, b){
+      var x = col.sortVal(a), y = col.sortVal(b);
+      if (x === y) return 0;
+      return (x > y ? 1 : -1) * s.dir;
+    });
+
+    var body = el("tbody");
+    sorted.forEach(function(r){
+      var row = el("tr");
+      cols.forEach(function(c){
+        var td = c.cell(r);
+        td.setAttribute("data-h", c.head);     // the label in narrow mode
+        row.appendChild(td);
+      });
+      body.appendChild(row);
+    });
+    tb.appendChild(body);
+    wrap.appendChild(tb);
+    if (!rows.length) wrap.appendChild(el("div", "empty", empty));
+    host.appendChild(wrap);
+  }
+
+  var TEAMCOLS = [
+    { head:"Team",   key:"code",  sortVal:function(r){ return r.code; },
+      cell:function(r){ return el("td","code", r.code); } },
+    { head:"Host",   key:"host",  sortVal:function(r){ return r.host; },
+      cell:function(r){ return el("td","", r.host); } },
+    { head:"Guest",  key:"guest", sortVal:function(r){ return r.guest; },
+      cell:function(r){ return el("td","", r.guest); } },
+    { head:"Rounds", key:"done",  sortVal:function(r){ return r.done; },
+      cell:function(r){ return el("td","num", String(r.done)); } },
+    { head:"Status", key:"status",sortVal:function(r){ return r.status; },
+      cell:function(r){
+        var td = el("td");
+        td.appendChild(el("span", "pill " + r.kind, r.status));
+        return td;
+      } },
+    { head:"For",    key:"since", sortVal:function(r){ return r.since || 0; },
+      cell:function(r){
+        var s = sinceCell(r);
+        return el("td", "num" + (s.over ? " over" : ""), s.text);
+      } }
+  ];
+
+  var ROUNDCOLS = [
+    { head:"Team",  key:"code", sortVal:function(r){ return r.code; },
+      cell:function(r){ return el("td","code", r.code); } },
+    { head:"Host",  key:"host", sortVal:function(r){ return r.host; },
+      cell:function(r){ return el("td","", r.host); } },
+    { head:"Guest", key:"guest", sortVal:function(r){ return r.guest; },
+      cell:function(r){ return el("td","", r.guest); } },
+    { head:"Round", key:"n", sortVal:function(r){ return r.n; },
+      cell:function(r){ return el("td","num", String(r.n)); } },
+    { head:"Level", key:"tier", sortVal:function(r){ return "EMH".indexOf(r.tier); },
+      cell:function(r){ return el("td","dim", r.tierName); } },
+    { head:"Status", key:"how", sortVal:function(r){ return r.how; },
+      cell:function(r){
+        var td = el("td");
+        td.appendChild(el("span", "pill " + (r.how === "ended" ? "lobby" : "done"), r.how));
+        return td;
+      } },
+    { head:"Time",  key:"elapsedMs", sortVal:function(r){ return r.elapsedMs === null ? -1 : r.elapsedMs; },
+      cell:function(r){ return el("td","num", dur(r.elapsedMs)); } },
+    { head:"Score", key:"verdict", sortVal:function(r){ return r.verdict; },
+      cell:function(r){
+        var td = el("td","score" + (r.verdict === "PERFECT" ? " good" : ""));
+        td.textContent = r.verdict === "PERFECT" ? "PERFECT"
+          : (r.wrong === null ? r.verdict : r.verdict + " \u00b7 " + r.wrong);
+        return td;
+      } },
+    { head:"Design", key:"designId", sortVal:function(r){ return r.designId; },
+      cell:function(r){ return el("td","code dim", r.designId); } },
+    { head:"Started", key:"startedAt", sortVal:function(r){ return r.startedAt || 0; },
+      cell:function(r){
+        var t = r.startedAt ? new Date(r.startedAt) : null;
+        return el("td","num dim", t
+          ? ("0"+t.getHours()).slice(-2) + ":" + ("0"+t.getMinutes()).slice(-2) : "\u2014");
+      } }
+  ];
+
+  /* ---------- CSV, for a spreadsheet afterwards ---------- */
+  function csvOf(rounds){
+    var head = ["team","host","guest","round","level","status","seconds",
+                "verdict","wrong","design","startedAt"];
+    var q = function(v){
+      v = (v === null || v === undefined) ? "" : String(v);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    };
+    var lines = [head.join(",")];
+    rounds.forEach(function(r){
+      lines.push([r.code, r.host, r.guest, r.n, r.tierName, r.how,
+                  r.elapsedMs === null ? "" : Math.round(r.elapsedMs/1000),
+                  r.verdict, r.wrong === null ? "" : r.wrong, r.designId,
+                  r.startedAt ? new Date(r.startedAt).toISOString() : ""
+                 ].map(q).join(","));
+    });
+    return lines.join("\n");
+  }
+
+  /* ==========================================================
+     3. DRAWING THE PAGE
+     ========================================================== */
+  var TEAMS = {}, ROUNDS = {}, SESS = "", LASTCSV = "";
+
+  function render(){
+    var main = document.getElementById("main");
+    clear(main);
+    if (!SESS){
+      main.appendChild(el("div", "glance", "Type a session code above."));
+      return;
+    }
+    var teams = readTeams(SESS), rounds = readRounds(SESS);
+    LASTCSV = csvOf(rounds);
+    var g = summarise(teams, rounds);
+
+    var gl = el("div", "glance");
+    gl.appendChild(el("b", "", String(g.teams)));
+    gl.appendChild(document.createTextNode(g.teams === 1 ? " team, " : " teams, "));
+    gl.appendChild(el("b", "live", String(g.playing)));
+    gl.appendChild(document.createTextNode(" mid-round. "));
+    gl.appendChild(el("b", "", String(g.rounds)));
+    gl.appendChild(document.createTextNode(g.rounds === 1 ? " round done, " : " rounds done, "));
+    gl.appendChild(el("b", "", String(g.perfect)));
+    gl.appendChild(document.createTextNode(" perfect. Median "));
+    gl.appendChild(el("b", "", dur(g.median)));
+    gl.appendChild(document.createTextNode("."));
+    main.appendChild(gl);
+
+    var s1 = el("section");
+    s1.appendChild(el("h2", "", "Teams"));
+    s1.appendChild(el("p", "subhead",
+      "Where each pair is now, and how long they have been there."));
+    table(s1, "teams", TEAMCOLS, teams, "No teams in this session yet.");
+    main.appendChild(s1);
+
+    var s2 = el("section");
+    s2.appendChild(el("h2", "", "Rounds"));
+    s2.appendChild(el("p", "subhead", "Every round that finished."));
+    var tiers = el("div", "tiers");
+    byTier(rounds).forEach(function(t){
+      var box = el("div", "tierbox");
+      box.appendChild(el("b", "", t.name));
+      box.appendChild(el("span", "", t.n + (t.n === 1 ? " round" : " rounds")));
+      box.appendChild(el("br"));
+      box.appendChild(el("span", "", "median " + dur(t.median) +
+        " \u00b7 " + t.perfect + " perfect"));
+      tiers.appendChild(box);
+    });
+    s2.appendChild(tiers);
+    table(s2, "rounds", ROUNDCOLS, rounds, "No rounds finished yet.");
+    main.appendChild(s2);
+
+    document.getElementById("foot").textContent =
+      "Reading /m/teams and /m/rounds. Read only. " + VERSION;
+  }
+
+  var pending = null;
+  function schedule(){
+    if (pending) return;
+    pending = setTimeout(function(){ pending = null; render(); }, 120);
+  }
+
+  /* ==========================================================
+     4. THE CONTROLS
+     ========================================================== */
+  function measureHead(){
+    var h = document.querySelector("header");
+    if (h) document.documentElement.style.setProperty("--headh", h.offsetHeight + "px");
+  }
+  window.addEventListener("resize", function(){ measureHead(); autoWide(); });
+
+  function theme(next){
+    document.documentElement.setAttribute("data-theme", next);
+    document.getElementById("bTheme").textContent = next === "light" ? "Dark" : "Light";
+    try { localStorage.setItem("relay.madmin.theme", next); } catch(e){}
+    measureHead();
+  }
+  var STEPS = [0.9, 1, 1.15, 1.3, 1.5, 1.75, 2], tsIx = 1;
+  function textSize(){
+    document.documentElement.style.setProperty("--ts", String(STEPS[tsIx]));
+    document.getElementById("tsDown").disabled = (tsIx === 0);
+    document.getElementById("tsUp").disabled = (tsIx === STEPS.length - 1);
+    try { localStorage.setItem("relay.madmin.ts", String(STEPS[tsIx])); } catch(e){}
+    measureHead();
+  }
+  var DENS = { dTight:["6px","18px"], dMed:["9px","26px"], dWide:["13px","34px"] };
+  function density(id){
+    var d = DENS[id] || DENS.dMed;
+    document.documentElement.style.setProperty("--rowpad", d[0]);
+    document.documentElement.style.setProperty("--gap", d[1]);
+    Object.keys(DENS).forEach(function(k){
+      document.getElementById(k).classList.toggle("on", k === id);
+    });
+    try { localStorage.setItem("relay.madmin.dens", id); } catch(e){}
+    measureHead();
+  }
+
+  /* WIDE or NARROW. It picks for itself on first load and then stays wherever
+     it is put, because a facilitator holding a phone in landscape may well
+     want the table and should not have to fight the width for it. */
+  var NARROW = false, NARROWSET = false;
+  function wide(n){
+    NARROW = !!n;
+    document.body.classList.toggle("narrow", NARROW);
+    document.getElementById("bWide").textContent = NARROW ? "Wide" : "Narrow";
+    measureHead();
+  }
+  function autoWide(){
+    if (NARROWSET) return;
+    wide(window.innerWidth < 760);
+  }
+
+  /* ==========================================================
+     5. THE DATABASE, READ ONLY
+     ========================================================== */
+  var FB_CONFIG = {
+    apiKey: "AIzaSyC-NH6Ov7sbrJN0mM54qIhRTsjl1Bj7LbQ",
+    authDomain: "relay-1b018.firebaseapp.com",
+    databaseURL: "https://relay-1b018-default-rtdb.firebaseio.com",
+    projectId: "relay-1b018",
+    storageBucket: "relay-1b018.firebasestorage.app",
+    messagingSenderId: "809917904513",
+    appId: "1:809917904513:web:201f6cef9b29a6a343ff80"
+  };
+  firebase.initializeApp(FB_CONFIG);
+  var DB = firebase.database();
+
+  var TIME_OFFSET = 0;
+  DB.ref("/.info/serverTimeOffset").on("value", function(sn){
+    TIME_OFFSET = sn.val() || 0;
+  });
+  function NOW(){ return Date.now() + TIME_OFFSET; }
+
+  DB.ref("/.info/connected").on("value", function(sn){
+    var n = document.getElementById("net");
+    n.textContent = sn.val() ? "connected" : "reconnecting";
+    n.className = "netstate" + (sn.val() ? "" : " off");
+  });
+
+  /* Firebase's own words, because permission_denied looks exactly like a dead
+     network from the outside and reads as "not my problem" to the one person
+     who could fix it in thirty seconds. */
+  function fail(e){
+    var main = document.getElementById("main");
+    var box = el("div", "fail");
+    box.appendChild(document.createTextNode("Could not read the database. "));
+    box.appendChild(el("code", "", (e && (e.message || e.code)) || "no reason given"));
+    box.appendChild(document.createTextNode(
+      /permission|denied/i.test(String(e && (e.message || e.code)))
+        ? "  The rules need a block for /m — check the Rules tab in Firebase."
+        : ""));
+    main.insertBefore(box, main.firstChild);
+  }
+
+  DB.ref("m/teams").on("value", function(sn){ TEAMS = sn.val() || {}; schedule(); }, fail);
+  DB.ref("m/rounds").on("value", function(sn){ ROUNDS = sn.val() || {}; schedule(); }, fail);
+
+  /* the "for how long" column moves on its own, so redraw it on a slow tick */
+  setInterval(function(){ if (SESS) schedule(); }, 5000);
+
+  /* ==========================================================
+     6. WIRING
+     ========================================================== */
+  function setSess(v){
+    SESS = (v || "").trim().toUpperCase();
+    document.getElementById("sess").value = SESS;
+    try { localStorage.setItem("relay.madmin.sess", SESS); } catch(e){}
+    render();
+  }
+  document.getElementById("sess").addEventListener("input", function(e){
+    setSess(e.target.value);
+  });
+  document.getElementById("bBeloit").onclick = function(){ setSess("BELOIT"); };
+  document.getElementById("bTest").onclick   = function(){ setSess("TEST"); };
+  document.getElementById("bTheme").onclick  = function(){
+    theme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+  };
+  document.getElementById("tsDown").onclick = function(){ if (tsIx > 0){ tsIx--; textSize(); } };
+  document.getElementById("tsUp").onclick   = function(){ if (tsIx < STEPS.length-1){ tsIx++; textSize(); } };
+  Object.keys(DENS).forEach(function(k){
+    document.getElementById(k).onclick = function(){ density(k); };
+  });
+  document.getElementById("bWide").onclick = function(){ NARROWSET = true; wide(!NARROW); };
+  document.getElementById("bCsv").onclick = function(){
+    var b = document.getElementById("bCsv");
+    var done = function(ok){ b.textContent = ok ? "Copied" : "Copy failed";
+      setTimeout(function(){ b.textContent = "Copy CSV"; }, 1600); };
+    try {
+      navigator.clipboard.writeText(LASTCSV).then(function(){ done(true); },
+                                                  function(){ done(false); });
+    } catch(e){ done(false); }
+  };
+
+  try {
+    theme(localStorage.getItem("relay.madmin.theme") || "dark");
+    var at = STEPS.indexOf(parseFloat(localStorage.getItem("relay.madmin.ts")));
+    if (at >= 0) tsIx = at;
+    density(localStorage.getItem("relay.madmin.dens") || "dMed");
+    SESS = localStorage.getItem("relay.madmin.sess") || "";
+    document.getElementById("sess").value = SESS;
+  } catch(e){}
+  textSize();
+  autoWide();
+  measureHead();
+  render();
+})();
+</script>
+</body>
+</html>
