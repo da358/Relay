@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.14</title>
+<title>Relay 260909.13</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -136,7 +136,10 @@
   /* the stage yields to the controls, never the other way round: on a short
      phone the SUBMIT button must always be reachable */
   #stage{ flex:1 1 auto; min-height:30vh; }
-  #scPlay.arch #stage{ flex:0 0 auto; height:56vh; min-height:0; }
+  /* the Architect has no controls under the stage. It can take most of the
+     screen, but not all of it: a canvas much taller than it is wide crops
+     the plate at the sides, which fitFov then has to undo. */
+  #scPlay.arch #stage{ flex:0 0 auto; height:70vh; min-height:0; }
   #dbDesign, #dbBuild{ flex:1 1 50%; min-height:0; }
   #stage canvas, #dbDesign canvas, #dbBuild canvas{
     position:absolute; inset:0; width:100%; height:100%; display:block;
@@ -152,11 +155,6 @@
     min-width:104px; text-align:center;
   }
   #dbDesign .pill{ top:22px; }
-  #plArchNote{
-    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
-    text-align:center; padding:14px 24px;
-    color:var(--dim); font-size:calc(15px * var(--ts)); line-height:1.45;
-  }
 
   #builderBar{ flex:0 0 auto; padding:8px 12px calc(6px + env(safe-area-inset-bottom)); }
   #swatches{ display:flex; gap:10px; margin:8px 0 0; }
@@ -190,7 +188,7 @@
     padding:24px; width:100%; max-width:420px; text-align:center;
   }
   #modHead{ font-weight:800; font-size:calc(19px * var(--ts)); }
-  #modBody{ margin:10px 0 22px; color:var(--dim); }
+  #modBody{ margin:10px 0 22px; color:var(--dim); text-align:left; line-height:1.5; }
   #modBtns{ display:flex; gap:12px; }
   #modBtns button{ flex:1; }
   #carry{
@@ -295,7 +293,6 @@
     </div>
     <canvas id="cvPlay"></canvas>
   </div>
-  <div id="plArchNote">Describe this to your teammate.<br>They cannot see it.</div>
   <div id="builderBar">
     <div class="seg">
       <button id="tAdd" class="on">ADD</button>
@@ -350,7 +347,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.14";
+  var VERSION = "260909.13";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -1926,6 +1923,31 @@
                "design. Only the Architect can see the design."
   };
 
+  /* Said once, the first time a player takes each job. A phone is a player,
+     so this is remembered on the phone rather than in the shared state: the
+     same person meeting the Builder's screen for the first time in round 3
+     needs it just as much as the one who met it in round 1. */
+  var ROLECARD = null;
+  function seenRole(role){
+    try { return localStorage.getItem("relay.m.role." + role) === "1"; }
+    catch(e){ return false; }
+  }
+  function markRole(role){
+    try { localStorage.setItem("relay.m.role." + role, "1"); } catch(e){}
+  }
+  var ROLECARDS = {
+    builder: { head:"You're a Builder",
+      body:"In ADD mode, pick a color below and drag or tap to add cubes to the " +
+           "building area. In REMOVE mode, tap a cube to take it away. Hit the " +
+           "VIEW button to rotate views. Talk to your Architect about what to " +
+           "build. When you're done, hit SUBMIT." },
+    architect: { head:"You're an Architect",
+      body:"Describe the design you see to your Builder. Talk back and forth as " +
+           "you wish, but don't look at each other's screens. Hit the VIEW " +
+           "button to rotate views. Orientation on the grid matters for a " +
+           "successful build." }
+  };
+
   var ME = null;            // "host" or "guest", decided when we take a seat
   var SESS = "";
   var UI = { screen:"landing", msg:"", busy:false, tapNote:"" };
@@ -2049,7 +2071,21 @@
       st.round.endedHow = how || "ended";
       st.phase = "debrief"; st.phaseAt = NOW();
     });
-    if (ME === "host") saveRound();
+  }
+
+  /* 260909.14 wrote the record from inside endRound, guarded by "am I the
+     host". But endRound runs on whichever phone pressed the button, so a
+     round ended or confirmed by the guest was never written down at all. The
+     record follows from the round REACHING the debrief, not from who sent it
+     there — so the host watches for that instead, once per round. */
+  var savedRound = null;
+  function maybeSave(){
+    if (ME !== "host") return;
+    var s = S();
+    if (s.phase !== "debrief" || !s.round) return;
+    if (savedRound === s.round.id) return;
+    savedRound = s.round.id;
+    saveRound();
   }
 
   /* ---------- the debrief ---------- */
@@ -2198,16 +2234,22 @@
 
     var arch = amArchitect();
     el("builderBar").style.display = arch ? "none" : "block";
-    el("plArchNote").style.display = arch ? "block" : "none";
     /* with no controls beneath it the stage would take the whole screen, and a
        vertical field of view on a very tall canvas cuts the plate off at the
        sides. Cap it so the Architect sees the same framing the Builder does. */
     el("scPlay").classList.toggle("arch", arch);
 
+    /* the job explained, before anything else can interrupt */
+    if (ROLECARD){
+      var card = ROLECARDS[ROLECARD];
+      PENDING = { head:card.head, body:card.body, only:true, yes:"OK",
+                  onYes: function(){ markRole(ROLECARD); ROLECARD = null; paint(); } };
+    }
+
     if (arch){
       if (lastDesign !== r.designId){ BV.paint(d.cubes, "none", {}); lastDesign = r.designId; }
       /* the confirmation, blind: the Architect never sees the build */
-      PENDING = r.submitted ? {
+      if (!ROLECARD) PENDING = r.submitted ? {
         head: r.names[r.hostRole === "architect" ? "guest" : "host"] + " says the build is done.",
         body: "Lock it in and see how you did?",
         yes: "YES", no: "NO",
@@ -2283,8 +2325,10 @@
     if (!same){
       el("modHead").textContent = spec.head;
       el("modBody").textContent = spec.body;
-      el("modYes").textContent = spec.yes;
-      el("modNo").textContent = spec.no;
+      el("modYes").textContent = spec.yes || "YES";
+      el("modNo").textContent = spec.no || "NO";
+      /* a card that only tells you something needs one way out, not two */
+      el("modNo").style.display = spec.only ? "none" : "block";
     }
     box.style.display = "flex";
   }
@@ -2560,12 +2604,15 @@
       lastRoundId = r.id;
       setView(0, true);
       TOOL = "place"; paintSwatches();
+      var role = myRole();
+      if (role && !seenRole(role)) ROLECARD = role;
     }
     if (!r) lastRoundId = null;
     if (!r){ BUILD = []; lastBuildSig = ""; lastDesign = ""; TAPPED = -1; UI.tapNote = ""; }
     else if (!amArchitect() && !BUILD.length && r.build && r.build.length)
       BUILD = r.build.slice();            // a reload, or this phone rejoining
     maybeStart();
+    maybeSave();
     maybeReturn();
   }
 

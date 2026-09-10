@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Relay mobile facilitator view 260909.1</title>
+<title>Relay mobile facilitator view 260909.2</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
@@ -120,6 +120,12 @@
   /* Something that has run too long. Bold and red, not a new colour: this is
      the only thing on the page that is trying to catch an eye across a room. */
   .over{ color:var(--red); font-weight:700; }
+  /* On white, red text alone does not carry across a room — the light palette
+     re-picks its accents darker for legibility, which costs exactly the
+     loudness this one cell needs. So on white it is reversed out instead. */
+  :root[data-theme="light"] td.over{
+    background:var(--red); color:#FFFFFF; font-weight:700;
+  }
 
   .tiers{ display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 0; }
   .tierbox{ border:1px solid var(--rule); border-radius:4px; padding:8px 12px;
@@ -157,7 +163,7 @@
 <body>
 <header>
   <div class="barrow">
-    <h1>Relay mobile <em>facilitator view 260909.1</em></h1>
+    <h1>Relay mobile <em>facilitator view 260909.2</em></h1>
     <span class="readonly">read only</span>
     <label class="field" for="sess">Session
       <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
@@ -188,7 +194,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.1";
+  var VERSION = "260909.2";
 
   /* ==========================================================
      1. READING WHAT THE GAME WROTE
@@ -336,7 +342,10 @@
     if (!t.since) return { text:"\u2014", over:false };
     var ms = NOW() - t.since;
     var cap = LIMITS[t.phase] || LIMITS.lobby;
-    return { text: dur(ms), over: ms > cap };
+    /* shown to the nearest five seconds, so the column reads 0:00, 0:05,
+       0:10 rather than 0:01, 0:06, 0:11. The comparison against the limit
+       uses the real elapsed time, not the rounded one. */
+    return { text: dur(Math.round(ms / 5000) * 5000), over: ms > cap };
   }
 
   var SORT = { teams:{ key:"code", dir:1 }, rounds:{ key:"startedAt", dir:-1 } };
