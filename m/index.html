@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay mobile touch testbed 260909.6</title>
+<title>Relay mobile touch testbed 260909.7</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -153,7 +153,7 @@
     <button class="k" id="bView">VIEW 1</button>
     <span id="viewHint">Tap to<br>change<br>views</span>
   </div>
-  <div id="stageInfo">Design<br><span id="mDesign">1 of 20</span></div>
+  <div id="stageInfo">Design<br><span id="mDesign">1 of 70</span><br><span id="mTier"></span></div>
   <canvas id="cvBuild"></canvas>
   <canvas id="cvDesign" style="display:none"></canvas>
 </div>
@@ -611,74 +611,225 @@
   GRID = 4; MAXY = 4;
 
   /* ==========================================================
-     MOBILE DESIGN SET (provisional)
-     The four families from library-260906 that are already
-     buildable on a 4x4 plate, translated onto it. 20 designs, no
-     face marks. Every one happens to be column-only, which is
-     still legal under the grounded rule; the authored set will
-     use overhangs. Replaced once the real set arrives.
+     MOBILE DESIGN SET · 70 designs, 14 families, 9 September 2026
+     Five families authored in maker 260903.5 for the phone
+     (vine, reach, alert, slouch, perk) and nine carried over
+     from library-260906 that already fit a 4x4x4 plate. Every
+     design translated onto that plate; verdictOf normalises to
+     the minimum corner, so the move changes no scoring.
+     Tiers are E, M, H. No face marks anywhere. Rule is grounded.
      ========================================================== */
   var MDESIGNS = [
-    { id:"d-cimve9", family:"d-cimve9", name:"lowboy", tier:"2E",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,0,"y",0],[1,0,2,"b",0],[1,0,1,"y",0],[1,0,0,"y",0],[1,1,1,"b",0]] },
-    { id:"d-y39dgp", family:"d-cimve9", name:"lowboy v2", tier:"2E",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,2,"y",0],[0,0,1,"o",0],[1,0,1,"y",0],[2,0,1,"y",0],[1,1,1,"o",0]] },
-    { id:"d-amvn08", family:"d-cimve9", name:"lowboy v3", tier:"2E",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,0,"o",0],[1,0,2,"y",0],[1,0,1,"o",0],[1,0,0,"o",0],[1,1,1,"y",0]] },
-    { id:"d-ukjken", family:"d-cimve9", name:"lowboy v4", tier:"2E",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[0,0,2,"o",0],[2,0,1,"b",0],[1,0,1,"o",0],[0,0,1,"o",0],[1,1,1,"b",0]] },
-    { id:"d-xwyto1", family:"d-cimve9", name:"lowboy v5", tier:"2E",
-      glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,1,"y",0],[0,0,2,"b",0],[1,0,2,"y",0],[2,0,2,"y",0],[1,1,2,"b",0]] },
-    { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"1",
+    { id:"d-coxziw", family:"d-coxziw", name:"welcome", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"p",0],[1,0,1,"b",0],[2,0,1,"p",0],[2,0,2,"p",0],[0,1,1,"b",0]] },
-    { id:"d-f5fg4s", family:"d-coxziw", name:"welcome v2", tier:"1",
+    { id:"d-f5fg4s", family:"d-coxziw", name:"welcome v2", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"b",0],[2,0,1,"y",0],[2,0,0,"b",0],[1,0,0,"b",0],[2,1,2,"y",0]] },
-    { id:"d-7yje46", family:"d-coxziw", name:"welcome v3", tier:"1",
+    { id:"d-7yje46", family:"d-coxziw", name:"welcome v3", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"p",0],[1,0,1,"y",0],[0,0,1,"p",0],[0,0,2,"p",0],[2,1,1,"y",0]] },
-    { id:"d-m788w1", family:"d-coxziw", name:"welcome v4", tier:"1",
+    { id:"d-m788w1", family:"d-coxziw", name:"welcome v4", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"p",0],[2,0,1,"y",0],[2,0,2,"p",0],[1,0,2,"p",0],[2,1,0,"y",0]] },
-    { id:"d-su6uto", family:"d-coxziw", name:"welcome v5", tier:"1",
+    { id:"d-su6uto", family:"d-coxziw", name:"welcome v5", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,2,"b",0],[1,0,2,"o",0],[2,0,2,"b",0],[2,0,1,"b",0],[0,1,2,"o",0]] },
-    { id:"d-9uifid", family:"d-9uifid", name:"jetty", tier:"1",
+    { id:"d-9uifid", family:"d-9uifid", name:"jetty", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[1,0,2,"p",0],[2,0,2,"p",0],[0,1,1,"p",0]] },
-    { id:"d-r8k08j", family:"d-9uifid", name:"jetty v2", tier:"1",
+    { id:"d-r8k08j", family:"d-9uifid", name:"jetty v2", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[1,0,1,"p",0],[1,0,2,"p",0],[2,1,0,"p",0]] },
-    { id:"d-3chiv8", family:"d-9uifid", name:"jetty v3", tier:"1",
+    { id:"d-3chiv8", family:"d-9uifid", name:"jetty v3", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"o",0],[1,0,2,"o",0],[1,0,1,"b",0],[0,0,1,"b",0],[2,1,2,"b",0]] },
-    { id:"d-1a0eb8", family:"d-9uifid", name:"jetty v4", tier:"1",
+    { id:"d-1a0eb8", family:"d-9uifid", name:"jetty v4", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"p",0],[1,0,1,"p",0],[1,0,2,"o",0],[0,0,2,"o",0],[2,1,1,"o",0]] },
-    { id:"d-c1yf6d", family:"d-9uifid", name:"jetty v5", tier:"1",
+    { id:"d-c1yf6d", family:"d-9uifid", name:"jetty v5", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"b",0],[2,0,1,"b",0],[1,0,1,"p",0],[1,0,0,"p",0],[2,1,2,"p",0]] },
-    { id:"d-eh011t", family:"d-eh011t", name:"ledge", tier:"1",
+    { id:"d-eh011t", family:"d-eh011t", name:"ledge", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[0,0,1,"b",0],[1,0,1,"b",0],[2,0,1,"b",0],[2,0,2,"y",0],[1,1,1,"y",0],[2,1,1,"y",0]] },
-    { id:"d-6rgqsr", family:"d-eh011t", name:"ledge v2", tier:"1",
+    { id:"d-6rgqsr", family:"d-eh011t", name:"ledge v2", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,0,"y",0],[2,0,1,"y",0],[2,0,2,"y",0],[1,0,2,"o",0],[2,1,1,"o",0],[2,1,2,"o",0]] },
-    { id:"d-83ptoe", family:"d-eh011t", name:"ledge v3", tier:"1",
+    { id:"d-83ptoe", family:"d-eh011t", name:"ledge v3", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,2,"y",0],[1,0,2,"y",0],[0,0,2,"y",0],[0,0,1,"p",0],[1,1,2,"p",0],[0,1,2,"p",0]] },
-    { id:"d-3rwav2", family:"d-eh011t", name:"ledge v4", tier:"1",
+    { id:"d-3rwav2", family:"d-eh011t", name:"ledge v4", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
       cubes:[[2,0,1,"o",0],[1,0,1,"o",0],[0,0,1,"o",0],[0,0,2,"p",0],[1,1,1,"p",0],[0,1,1,"p",0]] },
-    { id:"d-2x3u62", family:"d-eh011t", name:"ledge v5", tier:"1",
+    { id:"d-2x3u62", family:"d-eh011t", name:"ledge v5", tier:"E",
       glyphs:"none", faces:"top", rule:"grounded",
-      cubes:[[2,0,2,"y",0],[2,0,1,"y",0],[2,0,0,"y",0],[1,0,0,"b",0],[2,1,1,"b",0],[2,1,0,"b",0]] }
+      cubes:[[2,0,2,"y",0],[2,0,1,"y",0],[2,0,0,"y",0],[1,0,0,"b",0],[2,1,1,"b",0],[2,1,0,"b",0]] },
+    { id:"d-cimve9", family:"d-cimve9", name:"lowboy", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"y",0],[1,0,2,"b",0],[1,0,1,"y",0],[1,0,0,"y",0],[1,1,1,"b",0]] },
+    { id:"d-y39dgp", family:"d-cimve9", name:"lowboy v2", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,2,"y",0],[0,0,1,"o",0],[1,0,1,"y",0],[2,0,1,"y",0],[1,1,1,"o",0]] },
+    { id:"d-amvn08", family:"d-cimve9", name:"lowboy v3", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"o",0],[1,0,2,"y",0],[1,0,1,"o",0],[1,0,0,"o",0],[1,1,1,"y",0]] },
+    { id:"d-ukjken", family:"d-cimve9", name:"lowboy v4", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,2,"o",0],[2,0,1,"b",0],[1,0,1,"o",0],[0,0,1,"o",0],[1,1,1,"b",0]] },
+    { id:"d-xwyto1", family:"d-cimve9", name:"lowboy v5", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"y",0],[0,0,2,"b",0],[1,0,2,"y",0],[2,0,2,"y",0],[1,1,2,"b",0]] },
+    { id:"d-d6r1q6", family:"d-d6r1q6", name:"tallboy", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"o",0],[2,1,1,"o",0],[2,2,1,"p",0],[1,1,1,"p",0]] },
+    { id:"d-uwy3rg", family:"d-d6r1q6", name:"tallboy v2", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"b",0],[1,1,2,"b",0],[1,2,2,"y",0],[1,1,1,"y",0]] },
+    { id:"d-mtnn2f", family:"d-d6r1q6", name:"tallboy v3", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"p",0],[1,1,1,"p",0],[1,2,1,"b",0],[2,1,1,"b",0]] },
+    { id:"d-bfi68v", family:"d-d6r1q6", name:"tallboy v4", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"o",0],[1,1,1,"o",0],[1,2,1,"p",0],[2,1,1,"p",0]] },
+    { id:"d-jwmnxn", family:"d-d6r1q6", name:"tallboy v5", tier:"E",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"o",0],[1,1,2,"o",0],[1,2,2,"b",0],[1,1,1,"b",0]] },
+    { id:"d-9knami", family:"d-9knami", name:"periscope", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"o",0],[1,0,0,"b",0],[1,0,1,"o",0],[1,1,1,"y",0],[1,2,1,"y",0],[1,2,2,"o",0]] },
+    { id:"d-vyjqrj", family:"d-9knami", name:"periscope v2", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"o",0],[2,0,2,"y",0],[1,0,2,"o",0],[1,1,2,"b",0],[1,2,2,"b",0],[0,2,2,"o",0]] },
+    { id:"d-x9i2p8", family:"d-9knami", name:"periscope v3", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"p",0],[0,0,2,"y",0],[1,0,2,"p",0],[1,1,2,"b",0],[1,2,2,"b",0],[2,2,2,"p",0]] },
+    { id:"d-9rp4ca", family:"d-9knami", name:"periscope v4", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"o",0],[2,0,2,"p",0],[2,0,1,"o",0],[2,1,1,"y",0],[2,2,1,"y",0],[2,2,0,"o",0]] },
+    { id:"d-0jamen", family:"d-9knami", name:"periscope v5", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,2,"o",0],[0,0,1,"p",0],[1,0,1,"o",0],[1,1,1,"b",0],[1,2,1,"b",0],[2,2,1,"o",0]] },
+    { id:"d-6iirbx", family:"d-6iirbx", name:"tucked", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"p",0],[0,0,2,"p",0],[1,0,2,"p",0],[0,1,2,"b",0],[0,2,2,"o",0],[1,2,2,"b",0],[2,2,2,"b",0]] },
+    { id:"d-oqmxzv", family:"d-6iirbx", name:"tucked v2", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"b",0],[2,0,2,"b",0],[2,0,1,"b",0],[2,1,2,"o",0],[2,2,2,"y",0],[2,2,1,"o",0],[2,2,0,"o",0]] },
+    { id:"d-jh2vy5", family:"d-6iirbx", name:"tucked v3", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,2,"y",0],[2,0,1,"y",0],[1,0,1,"y",0],[2,1,1,"b",0],[2,2,1,"p",0],[1,2,1,"b",0],[0,2,1,"b",0]] },
+    { id:"d-p7fysq", family:"d-6iirbx", name:"tucked v4", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,2,"p",0],[2,0,1,"p",0],[1,0,1,"p",0],[2,1,1,"o",0],[2,2,1,"y",0],[1,2,1,"o",0],[0,2,1,"o",0]] },
+    { id:"d-0o0v22", family:"d-6iirbx", name:"tucked v5", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,2,"p",0],[1,0,2,"p",0],[1,0,1,"p",0],[1,1,2,"o",0],[1,2,2,"y",0],[1,2,1,"o",0],[1,2,0,"o",0]] },
+    { id:"d-v6xa1s", family:"d-v6xa1s", name:"emu", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"p",0],[1,1,1,"p",0],[2,1,1,"o",0],[0,1,1,"p",0],[0,2,1,"o",0],[0,3,1,"o",0],[0,3,0,"y",0],[0,3,2,"y",0]] },
+    { id:"d-v0blvo", family:"d-v6xa1s", name:"emu v2", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"o",0],[1,1,1,"o",0],[1,1,2,"b",0],[1,1,0,"o",0],[1,2,0,"b",0],[1,3,0,"b",0],[2,3,0,"p",0],[0,3,0,"p",0]] },
+    { id:"d-ys7h3t", family:"d-v6xa1s", name:"emu v3", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"p",0],[1,1,1,"p",0],[1,1,2,"b",0],[1,1,0,"p",0],[1,2,0,"b",0],[1,3,0,"b",0],[2,3,0,"y",0],[0,3,0,"y",0]] },
+    { id:"d-q80r7f", family:"d-v6xa1s", name:"emu v4", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"b",0],[1,1,1,"b",0],[2,1,1,"y",0],[0,1,1,"b",0],[0,2,1,"y",0],[0,3,1,"y",0],[0,3,2,"p",0],[0,3,0,"p",0]] },
+    { id:"d-x6kmg5", family:"d-v6xa1s", name:"emu v5", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"b",0],[1,1,1,"b",0],[1,1,2,"y",0],[1,1,0,"b",0],[1,2,0,"y",0],[1,3,0,"y",0],[0,3,0,"p",0],[2,3,0,"p",0]] },
+    { id:"d-omesmf", family:"d-omesmf", name:"arch", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,3,"b",0],[0,1,3,"o",0],[0,2,3,"p",0],[0,0,0,"o",0],[0,1,0,"b",0],[0,2,0,"y",0],[0,2,1,"p",0],[0,2,2,"o",0],[1,2,2,"b",0],[2,2,2,"o",0],[2,3,2,"p",0]] },
+    { id:"d-xtv8az", family:"d-omesmf", name:"arch v2", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[3,0,0,"o",0],[3,1,0,"p",0],[3,2,0,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[1,2,0,"b",0],[2,2,0,"p",0],[2,2,1,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
+    { id:"d-gl71nq", family:"d-omesmf", name:"arch v3", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,0,"b",0],[0,1,0,"y",0],[0,2,0,"o",0],[0,0,3,"y",0],[0,1,3,"b",0],[0,2,3,"p",0],[0,2,2,"o",0],[0,2,1,"y",0],[1,2,1,"b",0],[2,2,1,"y",0],[2,3,1,"o",0]] },
+    { id:"d-avitrw", family:"d-omesmf", name:"arch v4", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"o",0],[2,1,0,"b",0],[2,2,0,"y",0],[2,0,3,"b",0],[2,1,3,"o",0],[2,2,3,"p",0],[2,2,2,"y",0],[2,2,1,"b",0],[1,2,1,"o",0],[0,2,1,"b",0],[0,3,1,"y",0]] },
+    { id:"d-awglto", family:"d-omesmf", name:"arch v5", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,3,"o",0],[0,1,3,"p",0],[0,2,3,"b",0],[0,0,0,"p",0],[0,1,0,"o",0],[0,2,0,"y",0],[0,2,1,"b",0],[0,2,2,"p",0],[1,2,2,"o",0],[2,2,2,"p",0],[2,3,2,"b",0]] },
+    { id:"d-m9gfu2", family:"d-m9gfu2", name:"vine", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"b",0],[1,0,1,"o",0],[1,1,1,"p",0],[1,2,1,"p",0],[1,2,2,"b",0],[1,3,2,"o",0]] },
+    { id:"d-jjyej1", family:"d-m9gfu2", name:"vine v2", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,1,"p",0],[2,0,1,"o",0],[2,1,1,"b",0],[2,2,1,"b",0],[2,2,2,"p",0],[2,3,2,"o",0]] },
+    { id:"d-n3eymd", family:"d-m9gfu2", name:"vine v3", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"o",0],[1,0,1,"y",0],[1,1,1,"p",0],[1,2,1,"p",0],[2,2,1,"o",0],[2,3,1,"y",0]] },
+    { id:"d-yqh3t6", family:"d-m9gfu2", name:"vine v4", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"p",0],[2,0,2,"b",0],[2,1,2,"o",0],[2,2,2,"o",0],[1,2,2,"p",0],[1,3,2,"b",0]] },
+    { id:"d-3qyjce", family:"d-m9gfu2", name:"vine v5", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,2,"o",0],[1,0,2,"b",0],[1,1,2,"p",0],[1,2,2,"p",0],[1,2,1,"o",0],[1,3,1,"b",0]] },
+    { id:"d-ht9z4q", family:"d-ht9z4q", name:"reach", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"b",0],[1,0,1,"o",0],[1,1,1,"y",0],[2,1,1,"b",0],[2,1,2,"y",0],[2,1,0,"o",0],[2,2,0,"y",0],[2,3,0,"b",0]] },
+    { id:"d-24flrg", family:"d-ht9z4q", name:"reach v2", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,0,"b",0],[1,0,1,"y",0],[1,1,1,"o",0],[1,1,2,"b",0],[0,1,2,"o",0],[2,1,2,"y",0],[2,2,2,"o",0],[2,3,2,"b",0]] },
+    { id:"d-4nho6e", family:"d-ht9z4q", name:"reach v3", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,0,"y",0],[1,0,1,"o",0],[1,1,1,"p",0],[1,1,2,"y",0],[0,1,2,"p",0],[2,1,2,"o",0],[2,2,2,"p",0],[2,3,2,"y",0]] },
+    { id:"d-l3m8fv", family:"d-ht9z4q", name:"reach v4", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"o",0],[1,0,1,"b",0],[1,1,1,"y",0],[0,1,1,"o",0],[0,1,0,"y",0],[0,1,2,"b",0],[0,2,2,"y",0],[0,3,2,"o",0]] },
+    { id:"d-1tjo4i", family:"d-ht9z4q", name:"reach v5", tier:"M",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,0,"p",0],[1,0,1,"b",0],[1,1,1,"y",0],[1,1,2,"p",0],[2,1,2,"y",0],[0,1,2,"b",0],[0,2,2,"y",0],[0,3,2,"p",0]] },
+    { id:"d-df7x45", family:"d-df7x45", name:"alert", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,0,"p",0],[2,1,0,"p",0],[2,0,2,"o",0],[2,1,2,"y",0],[2,1,1,"b",0],[1,1,2,"b",0],[0,1,2,"y",0],[0,2,2,"o",0],[0,2,3,"b",0]] },
+    { id:"d-iphww0", family:"d-df7x45", name:"alert v2", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,0,"b",0],[0,1,0,"b",0],[2,0,0,"p",0],[2,1,0,"o",0],[1,1,0,"y",0],[2,1,1,"y",0],[2,1,2,"o",0],[2,2,2,"p",0],[3,2,2,"y",0]] },
+    { id:"d-upbkvf", family:"d-df7x45", name:"alert v3", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,3,"y",0],[0,1,3,"y",0],[0,0,1,"b",0],[0,1,1,"o",0],[0,1,2,"p",0],[1,1,1,"p",0],[2,1,1,"o",0],[2,2,1,"b",0],[2,2,0,"p",0]] },
+    { id:"d-21sw3p", family:"d-df7x45", name:"alert v4", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[3,0,2,"o",0],[3,1,2,"o",0],[1,0,2,"p",0],[1,1,2,"y",0],[2,1,2,"b",0],[1,1,1,"b",0],[1,1,0,"y",0],[1,2,0,"p",0],[0,2,0,"b",0]] },
+    { id:"d-be1b1f", family:"d-df7x45", name:"alert v5", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,0,"y",0],[0,1,0,"y",0],[0,0,2,"b",0],[0,1,2,"p",0],[0,1,1,"o",0],[1,1,2,"o",0],[2,1,2,"p",0],[2,2,2,"b",0],[2,2,3,"o",0]] },
+    { id:"d-5ptt34", family:"d-5ptt34", name:"slouch", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"o",0],[0,1,1,"y",0],[1,1,1,"b",0],[1,2,1,"y",0],[2,2,1,"o",0],[3,2,1,"o",0],[3,0,1,"b",0],[3,1,1,"y",0],[3,1,2,"b",0],[2,3,1,"o",0]] },
+    { id:"d-f0skaf", family:"d-5ptt34", name:"slouch v2", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"p",0],[0,1,1,"b",0],[1,1,1,"o",0],[1,2,1,"b",0],[2,2,1,"p",0],[3,2,1,"p",0],[3,0,1,"o",0],[3,1,1,"b",0],[3,1,2,"o",0],[2,3,1,"p",0]] },
+    { id:"d-kicyhy", family:"d-5ptt34", name:"slouch v3", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[3,0,2,"o",0],[3,1,2,"b",0],[2,1,2,"p",0],[2,2,2,"b",0],[1,2,2,"o",0],[0,2,2,"o",0],[0,0,2,"p",0],[0,1,2,"b",0],[0,1,1,"p",0],[1,3,2,"o",0]] },
+    { id:"d-sfn40q", family:"d-5ptt34", name:"slouch v4", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,3,"o",0],[1,1,3,"b",0],[1,1,2,"p",0],[1,2,2,"b",0],[1,2,1,"o",0],[1,2,0,"o",0],[1,0,0,"p",0],[1,1,0,"b",0],[2,1,0,"p",0],[1,3,1,"o",0]] },
+    { id:"d-p5a0sb", family:"d-5ptt34", name:"slouch v5", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[0,0,1,"y",0],[0,1,1,"o",0],[1,1,1,"p",0],[1,2,1,"o",0],[2,2,1,"y",0],[3,2,1,"y",0],[3,0,1,"p",0],[3,1,1,"o",0],[3,1,2,"p",0],[2,3,1,"y",0]] },
+    { id:"d-9xuq0u", family:"d-9xuq0u", name:"perk", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,0,"o",0],[0,0,1,"b",0],[2,0,2,"p",0],[2,1,2,"o",0],[2,2,2,"b",0],[1,1,2,"o",0],[1,1,1,"p",0],[1,1,0,"y",0],[0,1,1,"o",0],[0,2,1,"b",0]] },
+    { id:"d-q0ne1k", family:"d-9xuq0u", name:"perk v2", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,2,"b",0],[0,0,1,"o",0],[2,0,0,"y",0],[2,1,0,"b",0],[2,2,0,"o",0],[1,1,0,"b",0],[1,1,1,"y",0],[1,1,2,"p",0],[0,1,1,"b",0],[0,2,1,"o",0]] },
+    { id:"d-lrmxdq", family:"d-9xuq0u", name:"perk v3", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"b",0],[1,0,2,"y",0],[0,0,0,"o",0],[0,1,0,"b",0],[0,2,0,"y",0],[0,1,1,"b",0],[1,1,1,"o",0],[2,1,1,"p",0],[1,1,2,"b",0],[1,2,2,"y",0]] },
+    { id:"d-xk1s45", family:"d-9xuq0u", name:"perk v4", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[1,0,0,"p",0],[2,0,1,"y",0],[0,0,2,"b",0],[0,1,2,"p",0],[0,2,2,"y",0],[1,1,2,"p",0],[1,1,1,"b",0],[1,1,0,"o",0],[2,1,1,"p",0],[2,2,1,"y",0]] },
+    { id:"d-57bq9t", family:"d-9xuq0u", name:"perk v5", tier:"H",
+      glyphs:"none", faces:"top", rule:"grounded",
+      cubes:[[2,0,1,"p",0],[1,0,0,"b",0],[0,0,2,"o",0],[0,1,2,"p",0],[0,2,2,"b",0],[0,1,1,"p",0],[1,1,1,"o",0],[2,1,1,"y",0],[1,1,0,"p",0],[1,2,0,"b",0]] }
   ];
   /* ==========================================================
      11. COMPARISON AND VERDICTS
@@ -1164,7 +1315,7 @@
      is new and exists only to answer one question: does placing a
      cube on a phone feel right?
      ========================================================== */
-  var STAMP = "260909.6";
+  var STAMP = "260909.7";
 
   var M = {
     ix: 0,               // which design we are looking at
@@ -1366,6 +1517,7 @@
     if (BV) BV.paint(M.build, "none", {});
     if (DV) DV.paint(design().cubes, "none", {});
     el("mDesign").textContent = (M.ix + 1) + " of " + MLIB.length;
+    el("mTier").textContent = ({E:"easy",M:"medium",H:"hard"})[design().tier] || design().tier;
     el("mCount").textContent = M.build.length + (M.build.length === 1 ? " cube" : " cubes");
     el("mVerdict").textContent = "";
     el("mVerdict").className = "verdict";
