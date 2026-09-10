@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 260909.9</title>
+<title>Relay 260909.10</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -90,6 +90,11 @@
   #lobPick{ margin-top:30px; }
   #lobPick p, #lobTold{ margin:0 0 14px; }
   #lobTold{ margin-top:30px; }
+  #lobToldRole{ font-weight:800; }
+  #lobRoleWords{
+    margin:14px auto 0; max-width:420px; color:var(--dim);
+    font-size:calc(14px * var(--ts)); line-height:1.42; min-height:22px;
+  }
   #lobReady{ margin-top:auto; }
   #lobHint{ color:var(--dim); font-size:calc(13px * var(--ts)); min-height:20px; margin-top:10px; }
 
@@ -113,6 +118,9 @@
     position:relative; background:var(--panel); touch-action:none; overflow:hidden;
   }
   #stage{ flex:1 1 auto; min-height:52vh; }
+  /* the Architect has no controls under the stage, so cap it rather than let
+     it fill the screen — a very tall canvas crops the plate at the sides */
+  #scPlay.arch #stage{ flex:0 0 auto; height:58vh; min-height:0; }
   .viewRow{
     position:absolute; top:10px; left:10px; z-index:3;
     display:flex; align-items:center; gap:10px;
@@ -131,8 +139,9 @@
     letter-spacing:.10em; color:var(--paper);
   }
   #plArchNote{
-    position:absolute; bottom:10px; left:0; right:0; text-align:center; z-index:3;
-    color:var(--dim); font-size:calc(13px * var(--ts));
+    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:18px 24px;
+    color:var(--dim); font-size:calc(15px * var(--ts)); line-height:1.45;
   }
 
   #builderBar{ flex:0 0 auto; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); }
@@ -247,7 +256,8 @@
     </div>
   </div>
 
-  <p id="lobTold"></p>
+  <p id="lobTold"><span id="lobToldRole"></span><br><span id="lobToldTail"></span></p>
+  <p id="lobRoleWords"></p>
 
   <button class="big" id="lobReady" disabled>READY?</button>
   <div id="lobHint"></div>
@@ -272,8 +282,8 @@
       <span class="hint">Tap to<br>change<br>views</span>
     </div>
     <canvas id="cvPlay"></canvas>
-    <div id="plArchNote">Describe this to your teammate. They cannot see it.</div>
   </div>
+  <div id="plArchNote">Describe this to your teammate. They cannot see it.</div>
   <div id="builderBar">
     <div class="seg">
       <button id="tAdd" class="on">ADD</button>
@@ -326,7 +336,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.9";
+  var VERSION = "260909.10";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -1890,6 +1900,13 @@
      ready" at the same moment would otherwise deal two different
      designs, and the second would win by arriving last.
      ========================================================== */
+  var ROLEWORDS = {
+    architect: "The Architect sees the design and describes it, but cannot see " +
+               "what the Builder is making.",
+    builder:   "The Builder can see what they are making, but cannot see the " +
+               "design. Only the Architect can see the design."
+  };
+
   var ME = null;            // "host" or "guest", decided when we take a seat
   var SESS = "";
   var UI = { screen:"landing", msg:"", busy:false, tapNote:"" };
@@ -2106,15 +2123,26 @@
     el("lobPick").style.display = (!waiting && ME === "host") ? "block" : "none";
     el("lobTold").style.display = (!waiting && ME === "guest") ? "block" : "none";
 
+    var mineRole = null;
     if (ME === "host"){
       el("roleArch").classList.toggle("on", lob.hostRole === "architect");
       el("roleBuild").classList.toggle("on", lob.hostRole === "builder");
+      mineRole = lob.hostRole || null;
+      el("lobToldRole").textContent = "";
+      el("lobToldTail").textContent = "";
     } else {
-      el("lobTold").textContent = lob.hostRole
-        ? "You're going to play as " +
-          (lob.hostRole === "architect" ? "BUILDER" : "ARCHITECT") + " for this round."
-        : "Waiting for your teammate to choose roles…";
+      mineRole = lob.hostRole
+        ? (lob.hostRole === "architect" ? "builder" : "architect") : null;
+      if (mineRole){
+        el("lobToldRole").textContent = "You're going to play as " + mineRole.toUpperCase();
+        el("lobToldTail").textContent = "for this round.";
+      } else {
+        el("lobToldRole").textContent = "Waiting for your teammate to choose roles…";
+        el("lobToldTail").textContent = "";
+      }
     }
+    /* what the job actually is, said once, where the choice is made */
+    el("lobRoleWords").textContent = mineRole ? ROLEWORDS[mineRole] : "";
 
     var mine = ME === "host" ? lob.readyHost : lob.readyGuest;
     var can = !waiting && !!lob.hostRole;
@@ -2141,6 +2169,10 @@
     var arch = amArchitect();
     el("builderBar").style.display = arch ? "none" : "block";
     el("plArchNote").style.display = arch ? "block" : "none";
+    /* with no controls beneath it the stage would take the whole screen, and a
+       vertical field of view on a very tall canvas cuts the plate off at the
+       sides. Cap it so the Architect sees the same framing the Builder does. */
+    el("scPlay").classList.toggle("arch", arch);
 
     if (arch){
       if (lastDesign !== r.designId){ BV.paint(d.cubes, "none", {}); lastDesign = r.designId; }
@@ -2293,6 +2325,24 @@
     ["plView","dbView"].forEach(function(id){
       var b = el(id); if (b) b.textContent = "VIEW " + (VIEW + 1);
     });
+  }
+
+  /* The fov is vertical, so a tall narrow canvas shows LESS across than a
+     square one and the plate runs off the sides. The Architect's stage is much
+     taller than the Builder's, because it has no controls under it. Widen the
+     view when, and only when, the canvas is too narrow to hold the plate;
+     a canvas the right shape already is left exactly as it was tuned. */
+  var BASE_FOV = 46;
+  function fitFov(V){
+    var c = V.canvas, w = c.clientWidth, h = c.clientHeight;
+    if (!w || !h) return;
+    var dist = V.cam.position.distanceTo(CENTRE);
+    if (!dist) return;
+    var halfWide = (GRID * Math.SQRT2 / 2) * 1.12;         // the plate corner to corner, plus air
+    var hHalf = Math.atan(halfWide / dist);
+    var needV = 2 * Math.atan(Math.tan(hHalf) / Math.max(0.25, w / h)) * 180 / Math.PI;
+    var want = Math.max(BASE_FOV, Math.min(90, needV));
+    if (Math.abs(V.cam.fov - want) > 0.25){ V.cam.fov = want; V.cam.updateProjectionMatrix(); }
   }
 
   var MOTION_REDUCED = reduceMotion;
@@ -2490,6 +2540,12 @@
     });
     on("resumeDrop", function(){ clearSeat("m"); paint(); });
 
+    /* the debrief's one button. 260909.9 painted it, disabled it, changed its
+       label — and never listened to it. A control that exists and does
+       nothing is worse than one that is missing, because it looks like the
+       game has frozen. */
+    on("dbGo", askReturn);
+
     on("roleArch",  function(){ pickRole("architect"); });
     on("roleBuild", function(){ pickRole("builder"); });
     on("lobReady",  pressReady);
@@ -2565,7 +2621,7 @@
       try {
         var dt = Math.min(0.05, (now - last) / 1000); last = now;
         VIEWERS.forEach(function(V){
-          try { V.resize(); V.step(dt); V.render(); } catch(e){}
+          try { V.resize(); fitFov(V); V.step(dt); V.render(); } catch(e){}
         });
       } finally { requestAnimationFrame(frame); }
     })(last);
@@ -2574,7 +2630,7 @@
       stamp:VERSION, grid:GRID, maxy:MAXY, rule:MRULE, designs:MLIB.length,
       sessions:SESSION_CODES.slice(), motionReduced:MOTION_REDUCED,
       turnMs:TURN_MS, skipsGlide:reduceMotion, carryLift:CARRY_LIFT,
-      fitZoom:FIT.zoom, fitDrop:FIT.drop,
+      fitZoom:FIT.zoom, fitDrop:FIT.drop, baseFov:BASE_FOV,
       glideLong:GLIDE_LONG, glideLeg:GLIDE_LEG,
       secure:window.isSecureContext, sessions2:SESSION_CODES.length,
       viewNow: function(){
