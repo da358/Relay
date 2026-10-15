@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 261015.2</title>
+<title>Relay 261015.3</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -138,6 +138,20 @@
     42%{ transform:scale(1.45); }
     100%{ transform:scale(1); }
   }
+  /* a switch that is on looks pressed */
+  button.k.tog{ color:var(--dim); }
+  button.k.tog.on{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
+  /* the no-grid cap, said rather than refused in silence */
+  .toast{
+    position:absolute; left:12px; right:12px; bottom:12px; z-index:5;
+    background:var(--red); color:#fff; border-radius:12px; padding:10px 12px;
+    font-weight:700; font-size:calc(14px * var(--ts)); text-align:center;
+    opacity:0; transition:opacity .18s; pointer-events:none;
+  }
+  .toast.on{ opacity:1; }
+  #lobGrid{ margin-top:22px; }
+  #lobGrid p{ margin:0 0 10px; }
+  #lobGridTold{ margin:14px 0 0; }
   #plHelp.bulge{ animation:bulge var(--bulge, 380ms) cubic-bezier(.34,1.15,.5,1); }
 
   #stage, #dbDesign, #dbBuild{
@@ -279,7 +293,16 @@
     </div>
   </div>
 
+  <div id="lobGrid">
+    <p>Grid for this build</p>
+    <div class="seg">
+      <button id="lobGridOff">NO GRID</button>
+      <button id="lobGridOn">GRID</button>
+    </div>
+  </div>
+
   <p id="lobTold"><span id="lobToldRole"></span><br><span id="lobToldTail"></span></p>
+  <p id="lobGridTold"></p>
   <p id="lobRoleWords"></p>
 
   <button class="big" id="lobReady" disabled>READY?</button>
@@ -295,13 +318,15 @@
   <div id="stage">
     <div class="stageTop">
       <button class="k" id="plView">VIEW 1</button>
-      <span class="hint">Tap to<br>change<br>views</span>
+      <span class="hint" id="plHint">Tap to<br>change<br>views</span>
       <span class="grow"></span>
       <span class="nethint" id="netHint"></span>
       <button class="k" id="plHelp" aria-label="What is my job?">?</button>
+      <button class="k tog on" id="plShade" style="display:none" aria-label="Footprint shading">SHADE</button>
       <button class="k" id="plTheme">DARK</button>
       <button class="k" id="plEnd">END</button>
     </div>
+    <div class="toast" id="capNote">Too wide. Every design fits within 4 &times; 4.</div>
     <canvas id="cvPlay"></canvas>
   </div>
   <div id="builderBar">
@@ -329,6 +354,7 @@
     <div class="stageTop">
       <button class="k" id="dbView">VIEW 1</button>
       <span class="grow"></span>
+      <button class="k tog on" id="dbShade" style="display:none" aria-label="Footprint shading">SHADE</button>
       <button class="k" id="dbTheme">DARK</button>
     </div>
     <span class="pill">DESIGN</span>
@@ -358,7 +384,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "261015.2";
+  var VERSION = "261015.3";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -1361,6 +1387,104 @@
   }
 
   /* ==========================================================
+     G0. NO GRID · THE RULES                              261015.3
+     Two modes, chosen per round and carried by the round:
+
+       GRID     today's game. A 4x4 plate, numbered views, and a
+                build that faces the wrong way is TURNED.
+       NO GRID  no plate. A cube may go anywhere on the floor, as
+                long as the build never gets wider than 4 in either
+                direction; every design fits in 4x4, so a build that
+                is right so far never meets that limit. Where a build
+                sits and which way it faces do not count. A mirror
+                image still does: it is a different object, and with
+                no shared frame it is the hardest thing left to say.
+
+     The copied sections above are untouched. The rule change is made
+     by re-pointing two names, inBounds and canPlace, that the copied
+     picker calls; with MODE.nogrid false both behave exactly as they
+     did before. Proven on the testbed, relay-m-nogrid-testbed-261015.2.
+     ========================================================== */
+  var CAP = 4;
+  var MODE = { nogrid:false, capOn:true, hold:false };
+
+  function extentOK(cubes, x, z){
+    var minx = x, maxx = x, minz = z, maxz = z;
+    for (var i = 0; i < cubes.length; i++){
+      var q = cubes[i];
+      if (q.x < minx) minx = q.x; if (q.x > maxx) maxx = q.x;
+      if (q.z < minz) minz = q.z; if (q.z > maxz) maxz = q.z;
+    }
+    return maxx - minx + 1 <= CAP && maxz - minz + 1 <= CAP;
+  }
+  var inBoundsOnPlate = inBounds, canPlaceOnPlate = canPlace;
+  inBounds = function(x, y, z){
+    return MODE.nogrid ? (y >= 0 && y < MAXY) : inBoundsOnPlate(x, y, z);
+  };
+  canPlace = function(cubes, rule, x, y, z){
+    if (!canPlaceOnPlate(cubes, rule, x, y, z)) return false;
+    return !MODE.nogrid || !MODE.capOn || extentOK(cubes, x, z);
+  };
+
+  function spinN(cs, k){ for (var i = 0; i < k; i++) cs = spin(cs); return cs; }
+
+  /* any quarter turn that matches counts. A shape that matches only when
+     turned, but never with the right colours, is a colour error. */
+  function freeVerdictOf(design, build){
+    if (!build || !build.length) return "NOT SUBMITTED";
+    var b = build;
+    for (var k = 0; k < 4; k++){
+      if (verdictOf(design, b) === "PERFECT") return "PERFECT";
+      b = spin(b);
+    }
+    var v = verdictOf(design, build);
+    return v === "TURNED" ? "COLORS" : v;
+  }
+  /* the quarter turn with the most cubes in place, then the most in the
+     right colour, then the fewest turns; diffOf does the sliding. The result
+     is in the design's own coordinates, so the debrief can draw the build
+     exactly over the design. */
+  function freeDiffOf(design, build){
+    var b = build || [], best = null;
+    for (var k = 0; k < 4; k++){
+      var df = diffOf(design, b);
+      var hit = b.length - df.extra, col = hit - df.color;
+      if (!best || hit > best.hit || (hit === best.hit && col > best.col))
+        best = { turns:k, df:df, hit:hit, col:col, spun:b };
+      b = spin(b);
+    }
+    var sh = best.df.shift;
+    best.aligned = best.spun.map(function(q){
+      return { x:q.x + sh.x, y:q.y, z:q.z + sh.z, c:q.c, o:q.o, fixed:q.fixed };
+    });
+    best.ghosts = best.df.ghosts.map(function(g){
+      return { x:g.x + sh.x, y:g.y, z:g.z + sh.z, c:g.c, o:g.o, fixed:g.fixed };
+    });
+    return best;
+  }
+  /* one place that decides how a round is judged, so the debrief, a tap in
+     the debrief and the round record can never disagree */
+  function judgeOf(design, build, grid){
+    var b = build || [];
+    if (grid){
+      var df = diffOf(design, b);
+      return { verdict:verdictOf(design, b), df:df, cubes:b, ghosts:df.ghosts, turns:0 };
+    }
+    var f = freeDiffOf(design, b);
+    return { verdict:freeVerdictOf(design, b), df:f.df, cubes:f.aligned,
+             ghosts:f.ghosts, turns:f.turns };
+  }
+  function centreOf(cubes){
+    if (!cubes || !cubes.length) return null;
+    var minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+    cubes.forEach(function(q){
+      if (q.x < minx) minx = q.x; if (q.x > maxx) maxx = q.x;
+      if (q.z < minz) minz = q.z; if (q.z > maxz) maxz = q.z;
+    });
+    return { x:(minx + maxx + 1) / 2, z:(minz + maxz + 1) / 2 };
+  }
+
+  /* ==========================================================
      13. SCENE PIECES                 [adapted from maker 260903.5]
      The maker had one scene; this has several, so the scene is a
      factory rather than a set of module-level singletons.
@@ -1620,6 +1744,163 @@
     ghost.add(gc);
   }
   /* ==========================================================
+     G1. ONE VIEWER FOR BOTH MODES                        261015.3
+     Replaces makeViewer (still in section 13, unused) for the game's
+     three stages. With the grid it behaves exactly as before: the
+     plate, a camera on the four presets around the plate's middle,
+     the same distance, height and turn. Without it, the plate is
+     hidden, the camera follows the middle of what is built, the
+     tappable floor grows far past the screen, and each column with a
+     cube in it gets a footprint, unless this phone has SHADE off.
+
+     The camera never moves while a finger is down (MODE.hold): a move
+     under a finger puts the cube somewhere other than where it was
+     aimed. Footprints differ from the background in lightness, not
+     hue, so colour-blind players see them the same way.
+     ========================================================== */
+  var FEET = { light:0xC3CDD7, dark:0x3B4B5D };
+  var FEETMATS = [];
+  var FOOT_SIZE = 1.2;
+  var FOLLOW_S = 0.11;               // the camera's ease: about 95% in a third of a second
+  var footGeo = null;
+  var SHADE = true;                  // this phone's choice, remembered on the phone
+  function plateMiddle(){ return { x:GRID/2, z:GRID/2 }; }
+  function offOf(i){
+    return new THREE.Vector3(VDIR[i][0]*ORBIT, LIFT - CENTRE.y, VDIR[i][1]*ORBIT);
+  }
+
+  function makeModeViewer(canvas, opts){
+    opts = opts || {};
+    var ren = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, alpha:true });
+    ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    var scene = new THREE.Scene(); furnish(scene, false);
+    var cam = new THREE.PerspectiveCamera(opts.fov || 42, 1, 0.1, 300);
+    var group = new THREE.Group(); scene.add(group);
+    var ghost = new THREE.Group(); ghost.visible = false; scene.add(ghost);
+
+    /* the plate, as furnish draws it, but in a group so it can be hidden */
+    var plate = new THREE.Group(); scene.add(plate);
+    var lineMat = new THREE.MeshBasicMaterial({ color:PLATE.line });
+    var edgeMat = new THREE.MeshBasicMaterial({ color:PLATE.edge });
+    PLATEMATS.push({ line:lineMat, edge:edgeMat });
+    for (var i = 0; i <= GRID; i++){
+      var thick = (i === 0 || i === GRID) ? 0.075 : 0.042;
+      var mm = (i === 0 || i === GRID) ? edgeMat : lineMat;
+      var a = new THREE.Mesh(new THREE.PlaneGeometry(GRID, thick), mm);
+      a.rotation.x = -Math.PI/2; a.position.set(GRID/2, 0.004, i); plate.add(a);
+      var b = new THREE.Mesh(new THREE.PlaneGeometry(thick, GRID), mm);
+      b.rotation.x = -Math.PI/2; b.position.set(i, 0.004, GRID/2); plate.add(b);
+    }
+
+    if (!footGeo) footGeo = new THREE.PlaneGeometry(FOOT_SIZE, FOOT_SIZE);
+    var feetMat = new THREE.MeshBasicMaterial({ color:FEET[THEME] || FEET.light });
+    FEETMATS.push(feetMat);
+    var feet = new THREE.Group(); scene.add(feet);
+
+    var plateHit = new THREE.Mesh(new THREE.PlaneGeometry(GRID, GRID),
+      new THREE.MeshBasicMaterial({ visible:false, side:THREE.DoubleSide }));
+    plateHit.rotation.x = -Math.PI/2; scene.add(plateHit);
+
+    var V = {
+      canvas:canvas, ren:ren, scene:scene, cam:cam, group:group, ghost:ghost,
+      plate:plate, feet:feet, plateHit:plateHit, grid:true,
+      viewIx:0, glide:null, cubes:[], famk:"none", faceMode:"top", dim:false, live:true,
+      centre: new THREE.Vector3(GRID/2, CENTRE.y, GRID/2),
+      centreTo: new THREE.Vector3(GRID/2, CENTRE.y, GRID/2),
+      off: offOf(0)
+    };
+    function place(){
+      cam.position.copy(V.centre).add(V.off);
+      cam.lookAt(V.centre);
+      if (V.grid) plateHit.position.set(GRID/2, 0, GRID/2);
+      else plateHit.position.set(V.centre.x, 0, V.centre.z);
+    }
+    /* with the grid, the floor you can tap is the plate; without it, far
+       larger than the screen, so a tap is never lost off an edge */
+    V.setGrid = function(grid){
+      grid = !!grid;
+      if (grid === V.grid) return;
+      V.grid = grid;
+      plate.visible = grid;
+      plateHit.geometry = new THREE.PlaneGeometry(grid ? GRID : 80, grid ? GRID : 80);
+      if (grid){ V.aimAt(plateMiddle(), true); }
+      place();
+    };
+    V.paint = function(cubes, famk, o){
+      o = o || {};
+      V.cubes = cubes; V.famk = famk;
+      while (group.children.length) group.remove(group.children[0]);
+      for (var i = 0; i < cubes.length; i++){
+        group.add(makeCube(cubes[i], famk, {
+          flag: o.flags ? o.flags[i] : null,
+          weight: o.weight, tint: o.tint,
+          style: o.styles ? o.styles[i] : null
+        }));
+      }
+      if (o.ghosts) o.ghosts.forEach(function(q){
+        group.add(makeCube(q, famk, { faint: o.ghostOpacity || 0.30 }));
+      });
+      /* one footprint per column with a cube in it; never for a ghost,
+         which is a cube that is NOT there */
+      while (feet.children.length) feet.remove(feet.children[0]);
+      if (!V.grid && SHADE){
+        var seen = {};
+        cubes.forEach(function(q){
+          var k = q.x + "," + q.z; if (seen[k]) return; seen[k] = 1;
+          var m = new THREE.Mesh(footGeo, feetMat);
+          m.rotation.x = -Math.PI/2; m.position.set(q.x + 0.5, 0.003, q.z + 0.5);
+          feet.add(m);
+        });
+      }
+    };
+    V.aimAt = function(c, snap){
+      if (!c) return;
+      V.centreTo.set(c.x, CENTRE.y, c.z);
+      if (snap){ V.centre.copy(V.centreTo); place(); }
+    };
+    V.snapTo = function(i){
+      V.viewIx = i; V.glide = null; V.off = offOf(i); place();
+    };
+    V.stepTo = function(i){
+      if (i === V.viewIx) return;
+      var diff = (i - V.viewIx + 4) % 4;
+      var legs = diff === 2 ? [(V.viewIx + 1) % 4, i] : [i];
+      V.glide = { legs:legs, li:0, from:V.off.clone(), to:offOf(legs[0]),
+                  t:0, dur:(diff === 2 ? GLIDE_LEG : GLIDE_LONG)/1000 };
+      V.viewIx = i;
+    };
+    V.step = function(dt){
+      if (V.glide){
+        V.glide.t += reduceMotion ? 1 : dt / V.glide.dur;
+        if (V.glide.t >= 1) V.glide.t = 1;
+        V.off.lerpVectors(V.glide.from, V.glide.to, ease(V.glide.t));
+        if (V.glide.t === 1){
+          V.glide.li++;
+          if (V.glide.li < V.glide.legs.length){
+            V.glide.from = V.off.clone(); V.glide.to = offOf(V.glide.legs[V.glide.li]); V.glide.t = 0;
+          } else V.glide = null;
+        }
+      }
+      if (!MODE.hold) V.centre.lerp(V.centreTo, 1 - Math.exp(-dt / FOLLOW_S));
+      place();
+    };
+    V.resize = function(){
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h || (w === V.lastW && h === V.lastH)) return;
+      V.lastW = w; V.lastH = h;
+      ren.setSize(w, h, false);
+      cam.aspect = w/h; cam.updateProjectionMatrix();
+    };
+    V.render = function(){
+      if (!canvas.clientWidth || !canvas.clientHeight) return;
+      ren.render(scene, cam);
+    };
+    place();
+    VIEWERS.push(V);
+    return V;
+  }
+
+  /* ==========================================================
      M3. SHARED STATE
      Firebase, behind read / write / subscribe, exactly as the
      laptop game does it and for the same reasons. The two rules
@@ -1703,7 +1984,9 @@
       lobby: s.lobby ? {
         hostRole: s.lobby.hostRole || "",
         readyHost: s.lobby.readyHost ? 1 : 0,
-        readyGuest: s.lobby.readyGuest ? 1 : 0
+        readyGuest: s.lobby.readyGuest ? 1 : 0,
+        /* the host's choice for the NEXT build; the round copies it at the deal */
+        grid: s.lobby.grid ? 1 : 0
       } : { none: 1 },
       round: { none: 1 }
     };
@@ -1725,7 +2008,9 @@
            "ended" when someone pressed END. The two look identical from the
            outside once the Builder has submitted, so it is recorded rather
            than inferred. */
-        endedHow: r.endedHow || ""
+        endedHow: r.endedHow || "",
+        /* which mode this round is played in, fixed at the deal */
+        grid: r.grid ? 1 : 0
       };
     }
     return w;
@@ -1740,7 +2025,8 @@
     if (w.lobby && !w.lobby.none){
       s.lobby = { hostRole: w.lobby.hostRole || null,
                   readyHost: !!w.lobby.readyHost,
-                  readyGuest: !!w.lobby.readyGuest };
+                  readyGuest: !!w.lobby.readyGuest,
+                  grid: !!w.lobby.grid };
     }
     if (w.round && !w.round.none){
       var r = w.round;
@@ -1756,7 +2042,8 @@
         asked: !!r.asked,
         guestOk: !!r.guestOk,
         endedBy: r.endedBy || null,
-        endedHow: r.endedHow || null
+        endedHow: r.endedHow || null,
+        grid: !!r.grid
       };
     }
     return s;
@@ -1767,7 +2054,7 @@
       team: { code:code, id:"t-" + Math.random().toString(36).slice(2, 8),
               session:sess, host:{ name:name }, guest:null },
       phase:"lobby", phaseAt: NOW(),
-      lobby: { hostRole:null, readyHost:false, readyGuest:false },
+      lobby: { hostRole:null, readyHost:false, readyGuest:false, grid:false },
       round:null, done:0, used:[] };
   }
   /* ---------- leaf-level diff ---------- */
@@ -1891,15 +2178,12 @@
       return "Could not reach the game server. Check the wifi and try again.";
     return "Could not " + doing + ". " + (m || "No reason given.");
   }
-  function freshTeamState(code, sess, name){
-    return { rev:0,
-      team: { code:code, id:"t-"+Math.random().toString(36).slice(2,8),
-              session:sess, host:{ name:name }, guest:null, usedRound1:[] },
-      phase:"lobby",
-      lobby: { levelId:"L1", targetMin:null, hostRole:"architect",
-               locked:false, proposal:null, rejected:false },
-      round:null, finished:[], warmup:null, pending:null };
-  }
+  /* 261015.3: a second freshTeamState stood here, the laptop's, copied in
+     with the state layer. Two functions with one name: the later silently
+     wins, so every phone-game team since at least 260909.19 started with the
+     laptop's lobby (Architect already chosen for the host, no phase stamp).
+     The phone's own version, above, is the only one now, and the logic suite
+     fails if any top-level function is ever declared twice. */
   /* A team code has to be unique across the room, so the claim is a
      transaction: if someone already holds the code the write is abandoned and
      another code is tried. */
@@ -2040,6 +2324,20 @@
   function rolesSeen(){
     return ["builder","architect"].filter(seenRole);
   }
+  /* the same two jobs, said for the mode this round is played in */
+  function cardFor(role, grid){
+    if (grid) return ROLECARDS[role];
+    return role === "builder" ? { head:"You're a Builder",
+      body:"In ADD mode, pick a color below and drag or tap to add cubes to the " +
+           "building area. In REMOVE mode, tap a cube to take it away. Hit " +
+           "TURN to turn the view. Talk to your Architect about what to " +
+           "build. When you're done, hit SUBMIT." }
+    : { head:"You're an Architect",
+      body:"Describe the design you see to your Builder. Talk back and forth as " +
+           "you wish, but don't look at each other's screens. Hit TURN to turn " +
+           "the view. There is no grid: where the build sits and which way it " +
+           "faces don't matter, but a mirror image is wrong." };
+  }
   var ROLECARDS = {
     builder: { head:"You're a Builder",
       body:"In ADD mode, pick a color below and drag or tap to add cubes to the " +
@@ -2100,8 +2398,20 @@
   function pickRole(role){
     if (ME !== "host") return;
     SHARED.write(function(st){
-      if (!st.lobby) st.lobby = { hostRole:null, readyHost:false, readyGuest:false };
+      if (!st.lobby) st.lobby = { hostRole:null, readyHost:false, readyGuest:false, grid:false };
       st.lobby.hostRole = role;
+    });
+  }
+  /* the grid is chosen per build, by the host, in the lobby, and only in the
+     development session: a real session cannot be run with a stray switch on */
+  function canChooseGrid(sess){ return sess === "TEST"; }
+  function pickGrid(on){
+    if (ME !== "host") return;
+    var s = S();
+    if (s.phase !== "lobby" || !s.team || !canChooseGrid(s.team.session)) return;
+    SHARED.write(function(st){
+      if (!st.lobby) st.lobby = { hostRole:null, readyHost:false, readyGuest:false, grid:false };
+      st.lobby.grid = !!on;
     });
   }
   function pressReady(){
@@ -2135,7 +2445,10 @@
         names: { host: t.host.name, guest: (t.guest && t.guest.name) || "" },
         startedAt: NOW(), endedAt: null, elapsedMs: null,
         build: null, submitted: false, asked: false, guestOk: false,
-        endedBy: null, endedHow: null
+        endedBy: null, endedHow: null,
+        /* copied from the lobby here and never changed again, so flipping the
+           switch can never touch a build in progress */
+        grid: canChooseGrid(t.session) ? !!(st.lobby && st.lobby.grid) : false
       };
       st.used = (st.used || []).concat([d.family]);
       st.phase = "play"; st.phaseAt = NOW();
@@ -2216,7 +2529,8 @@
       st.round = null;
       st.phase = "lobby"; st.phaseAt = NOW();
       st.lobby = { hostRole: st.lobby ? st.lobby.hostRole : null,
-                   readyHost:false, readyGuest:false };
+                   readyHost:false, readyGuest:false,
+                   grid: st.lobby ? !!st.lobby.grid : false };
     });
   }
 
@@ -2227,7 +2541,7 @@
     var s = S(), r = s.round; if (!r) return;
     var d = designById(r.designId); if (!d) return;
     var b = r.build || [];
-    var v = verdictOf(d, b), df = diffOf(d, b);
+    var J = judgeOf(d, b, r.grid), v = J.verdict, df = J.df;
     SHARED.saveRound({
       app:"relay-m", build:VERSION, session:s.team.session,
       team:{ id:s.team.id, code:s.team.code,
@@ -2240,7 +2554,10 @@
                designCubes:d.cubes.length,
                extra:df.extra, missing:df.missing, color:df.color,
                wrong: df.extra + df.missing + df.color,
-               placed: placedOf(b) }
+               placed: placedOf(b),
+               /* 261015.3: the mode, and how far the build was turned to line
+                  it up (always 0 with the grid, where turning is an error) */
+               grid: r.grid ? 1 : 0, turns: J.turns }
     });
   }
 
@@ -2318,6 +2635,15 @@
        phone that closes needs it back, but stop it shouting. */
     el("scLobby").classList.toggle("later", (s.done || 0) > 0);
 
+    /* the grid for the next build: the host chooses, the guest is told. Only
+       in the development session; a real session is always without */
+    var chooser = canChooseGrid(s.team.session);
+    el("lobGrid").style.display = (!waiting && ME === "host" && chooser) ? "block" : "none";
+    el("lobGridOff").classList.toggle("on", !lob.grid);
+    el("lobGridOn").classList.toggle("on", !!lob.grid);
+    el("lobGridTold").style.display = (!waiting && ME === "guest" && chooser) ? "block" : "none";
+    el("lobGridTold").textContent = "Next build: " + (lob.grid ? "with a grid" : "no grid");
+
     var mine = ME === "host" ? lob.readyHost : lob.readyGuest;
     var can = !waiting && !!lob.hostRole;
     var b = el("lobReady");
@@ -2333,8 +2659,34 @@
     el(pfx + "Sess").textContent = "Session: " + s.team.session;
   }
 
+  /* Called by the painters with the round's own mode. Local only: it never
+     writes to the shared state. A change of mode forces a repaint, because
+     footprints come and go with it. */
+  var MODE_SHOWN = null;
+  function applyMode(grid){
+    grid = !!grid;
+    MODE.nogrid = !grid;
+    VIEWERS.forEach(function(V){ V.setGrid(grid); });
+    if (MODE_SHOWN !== grid){ MODE_SHOWN = grid; lastDesign = ""; lastBuildSig = ""; }
+    var h = el("plHint"); if (h) h.style.display = grid ? "" : "none";
+    ["plShade","dbShade"].forEach(function(id){
+      var b = el(id); if (!b) return;
+      b.style.display = grid ? "none" : "";
+      b.classList.toggle("on", SHADE);
+    });
+    labelViews();
+  }
+  /* with the grid a view has a number both players can say; without it, it
+     has none, which is the point */
+  function labelViews(){
+    ["plView","dbView"].forEach(function(id){
+      var b = el(id); if (b) b.textContent = MODE.nogrid ? "TURN" : "VIEW " + (VIEW + 1);
+    });
+  }
+
   function paintPlay(){
     var s = S(), r = s.round, d = designById(r.designId);
+    applyMode(r.grid);
     header("pl");
     el("plClock").textContent = mmss(roundMs());
 
@@ -2347,13 +2699,16 @@
 
     /* the job explained, before anything else can interrupt */
     if (ROLECARD){
-      var card = ROLECARDS[ROLECARD];
+      var card = cardFor(ROLECARD, r.grid);
       PENDING = { head:card.head, body:card.body, only:true, yes:"OK",
                   onYes: function(){ markRole(ROLECARD); ROLECARD = null; paint(); } };
     }
 
     if (arch){
-      if (lastDesign !== r.designId){ BV.paint(d.cubes, "none", {}); lastDesign = r.designId; }
+      if (lastDesign !== r.designId){
+        BV.paint(d.cubes, "none", {}); lastDesign = r.designId;
+        BV.aimAt(r.grid ? plateMiddle() : centreOf(d.cubes), true);
+      }
       /* the confirmation, blind: the Architect never sees the build */
       if (!ROLECARD) PENDING = r.submitted ? {
         head: r.names[r.hostRole === "architect" ? "guest" : "host"] + " says the build is done.",
@@ -2379,16 +2734,20 @@
     header("db");
     el("dbClock").textContent = mmss(roundMs());
 
-    var v = verdictOf(d, b), df = diffOf(d, b);
-    DBGHOSTS = df.ghosts;
+    applyMode(r.grid);
+    var J = judgeOf(d, b, r.grid), v = J.verdict, df = J.df;
+    DBSHOWN = J;
     var flags = {}, styles = {};
     Object.keys(df.build).forEach(function(k){
       flags[k] = "extra";
       if (Number(k) !== TAPPED) styles[k] = "zebra";
     });
     RD.paint(d.cubes, "none", {});
-    RB.paint(b, "none", { flags:flags, styles:styles, ghosts:df.ghosts,
-                          weight:3, ghostOpacity:0.40 });
+    /* without the grid the build is drawn turned and slid onto the design, so
+       the two stages can be compared cube for cube */
+    RB.paint(J.cubes, "none", { flags:flags, styles:styles, ghosts:J.ghosts,
+                                weight:3, ghostOpacity:0.40 });
+    if (!r.grid){ var dc = centreOf(d.cubes); RD.aimAt(dc, true); RB.aimAt(dc, true); }
 
     var wrong = df.extra + df.missing + df.color;
     el("dbVerdict").textContent = v;
@@ -2396,7 +2755,8 @@
     el("dbErrors").textContent = wrong === 0
       ? "ERRORS: None. Perfect build"
       : "ERRORS: " + wrong + "  ·  " + diffWords(df);
-    el("dbTap").textContent = UI.tapNote;
+    el("dbTap").textContent = UI.tapNote ||
+      (J.turns ? "Your build is shown turned to line it up with the design." : "");
 
     if (ME === "host"){
       var hb = el("dbGo");
@@ -2417,12 +2777,13 @@
 
   /* which cube the debrief has been asked about */
   var TAPPED = -1;
-  /* the ghosts the debrief last DREW. The picker answers "which of these did
-     the finger hit" by identity, the very object drawn, so a tap must ask
-     about the ghosts that are on screen, not a list worked out afresh.
-     261015.1 asked about a fresh list, because diffOf now makes new ghosts
-     each time it lines a build up, and a tapped ghost answered nothing. */
-  var DBGHOSTS = [];
+  /* what the debrief last DREW: the judgement, its cubes and its ghosts. The
+     picker answers "which of these did the finger hit" by identity, the very
+     object drawn, so a tap must ask about what is on screen, not a list
+     worked out afresh. 261015.1 asked about a fresh list of ghosts and a
+     tapped ghost answered nothing; without the grid the build's own cubes
+     are redrawn turned and slid, so the same now holds for them too. */
+  var DBSHOWN = null;
   var WHYWORDS = { extra:"This cube should not be here.",
                    color:"Right place, wrong color.",
                    facing:"Right place, wrong way up." };
@@ -2497,6 +2858,7 @@
   var ORBIT0 = ORBIT, LIFT0 = LIFT, CY0 = CENTRE.y;
   var FIT = { zoom:0.92, drop:0.55 };
   var VIEW = 0;
+  var rnd4 = function(){ return Math.floor(Math.random() * 4); };
   function refit(){
     ORBIT = ORBIT0 * FIT.zoom; LIFT = LIFT0 * FIT.zoom;
     CENTRE.y = CY0 + FIT.drop;
@@ -2507,9 +2869,7 @@
   function setView(i, snap){
     VIEW = ((i % 4) + 4) % 4;
     VIEWERS.forEach(function(V){ if (snap) V.snapTo(VIEW); else V.stepTo(VIEW); });
-    ["plView","dbView"].forEach(function(id){
-      var b = el(id); if (b) b.textContent = "VIEW " + (VIEW + 1);
-    });
+    labelViews();
   }
 
   /* The fov is vertical, so a tall narrow canvas shows LESS across than a
@@ -2521,7 +2881,7 @@
   function fitFov(V){
     var c = V.canvas, w = c.clientWidth, h = c.clientHeight;
     if (!w || !h) return;
-    var dist = V.cam.position.distanceTo(CENTRE);
+    var dist = V.cam.position.distanceTo(V.centre || CENTRE);   // without the grid the camera follows the build
     if (!dist) return;
     var halfWide = (GRID * Math.SQRT2 / 2) * 1.12;         // the plate corner to corner, plus air
     var hHalf = Math.atan(halfWide / dist);
@@ -2543,6 +2903,7 @@
     PLATEMATS.forEach(function(p){
       p.line.color.setHex(PLATE.line); p.edge.color.setHex(PLATE.edge);
     });
+    FEETMATS.forEach(function(m){ m.color.setHex(FEET[next]); });
     ["plTheme","dbTheme"].forEach(function(id){
       var b = el(id); if (b) b.textContent = next === "light" ? "DARK" : "LIGHT";
     });
@@ -2577,9 +2938,23 @@
     var a = aim(ev);
     return a.x >= r.left && a.x <= r.right && a.y >= r.top && a.y <= r.bottom;
   }
+  /* Only ever from inside the stage. With the grid the tappable floor was
+     the plate, so an aim point below the stage (a plain tap on a swatch puts
+     it there, the cube being drawn above the fingertip) found nothing.
+     Without the grid the floor reaches far past the screen and would place
+     a cube out near the camera. Found on the testbed, 261015.1. And if the
+     4-wide cap refuses a cell that is otherwise fine, say so. */
   function mTarget(ev){
+    if (!inStage(ev)) return null;
     var a = aim(ev), pt = { clientX:a.x, clientY:a.y };
-    return pickIn(BV, pt, BUILD, MRULE, TOOL === "erase" ? "erase" : "place", 0, COLOUR);
+    var tool = TOOL === "erase" ? "erase" : "place";
+    var t = pickIn(BV, pt, BUILD, MRULE, tool, 0, COLOUR);
+    if (t || tool !== "place" || !MODE.nogrid) return t;
+    var raw = null;
+    MODE.capOn = false;
+    try { raw = pickIn(BV, pt, BUILD, MRULE, tool, 0, COLOUR); }
+    finally { MODE.capOn = true; }
+    return (raw && raw.kind === "cell") ? { kind:"capped", x:raw.x, y:raw.y, z:raw.z } : null;
   }
   function padAt(x, z, col){
     var pad = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.94),
@@ -2589,8 +2964,23 @@
     pad.position.set(x + 0.5, 0.014, z + 0.5);
     return pad;
   }
+  function refusedAt(t){
+    var m = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({
+      color:0xD6453F, transparent:true, opacity:0.30, depthWrite:false }));
+    m.position.set(t.x + 0.5, t.y + 0.5, t.z + 0.5);
+    var l = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color:0xD6453F }));
+    l.position.copy(m.position);
+    return [m, l];
+  }
   function showTarget(t){
     if (!BV) return;
+    if (t && t.kind === "capped"){
+      showGhostIn(BV, null, BUILD, MRULE, "place", 0, COLOUR, "none");
+      BV.ghost.visible = true;
+      refusedAt(t).forEach(function(o){ BV.ghost.add(o); });
+      BV.ghost.add(padAt(t.x, t.z, 0xD6453F));
+      return;
+    }
     showGhostIn(BV, t, BUILD, MRULE, TOOL === "erase" ? "erase" : "place", 0, COLOUR, "none");
     if (!t) return;
     if (t.kind === "cell") BV.ghost.add(padAt(t.x, t.z, 0x4FB6C8));
@@ -2605,12 +2995,23 @@
   function carryHide(){ el("carry").style.display = "none"; CARRY_ON = false; }
   function carryUpdate(){
     if (!G.on || !G.fromSwatch){ if (CARRY_ON) carryHide(); return; }
-    el("carry").style.display = (G.t && G.t.kind === "cell") ? "none" : "block";
+    el("carry").style.display = (G.t && (G.t.kind === "cell" || G.t.kind === "capped")) ? "none" : "block";
   }
 
+  var capTimer = null;
+  function capNote(){
+    var n = el("capNote"); if (!n) return;
+    n.classList.add("on");
+    clearTimeout(capTimer);
+    capTimer = setTimeout(function(){ n.classList.remove("on"); }, 2200);
+  }
   function commit(t){
     if (!t || t.kind === "empty") return;
+    if (t.kind === "capped") return capNote();
     BUILD = applyTarget(BUILD, t, COLOUR);
+    /* without the grid the camera eases across to the middle of what is now
+       built; it waits for the finger to lift, which it has, here */
+    if (MODE.nogrid && BUILD.length) BV.aimAt(centreOf(BUILD));
     pushBuild();                        // so a reload does not lose the build
     paint();
   }
@@ -2622,7 +3023,8 @@
       if (TOOL === "erase"){ TOOL = "place"; }
       paintSwatches();
     }
-    G.on = true; G.fromSwatch = !!swatch; G.overStage = inStage(ev);
+    G.on = true; MODE.hold = true;
+    G.fromSwatch = !!swatch; G.overStage = inStage(ev);
     G.t = mTarget(ev); showTarget(G.t);
     if (G.fromSwatch){ carryShow(COLOUR); carryTo(ev.clientX, ev.clientY); }
     carryUpdate();
@@ -2636,7 +3038,7 @@
   }
   function gup(){
     if (!G.on) return;
-    G.on = false;
+    G.on = false; MODE.hold = false;
     var t = G.t, over = G.overStage;
     G.t = null; G.overStage = false; G.fromSwatch = false;
     showTarget(null); carryHide();
@@ -2680,18 +3082,17 @@
   /* ---------- tapping a flagged cube in the debrief ---------- */
   function tapDebrief(ev){
     var s = S(); if (s.phase !== "debrief" || !RB) return;
-    var r = s.round, d = designById(r.designId), b = r.build || [];
-    var df = diffOf(d, b);
-    var p = pickIn(RB, ev, b, MRULE, "erase", 0, "y");
-    if (p && p.kind === "cube" && df.build[p.i] !== undefined){
+    var J = DBSHOWN; if (!J) return;
+    var p = pickIn(RB, ev, J.cubes, MRULE, "erase", 0, "y");
+    if (p && p.kind === "cube" && J.df.build[p.i] !== undefined){
       TAPPED = p.i;
-      UI.tapNote = WHYWORDS[df.build[p.i]] || "This cube does not match.";
+      UI.tapNote = WHYWORDS[J.df.build[p.i]] || "This cube does not match.";
       return paint();
     }
     /* the ghosts are in the same scene but not in the build, so the picker
        finds nothing for them. Ask again against the ghost list, or a missing
        cube would be the one kind of mistake you cannot enquire about. */
-    var g = pickIn(RB, ev, DBGHOSTS, MRULE, "erase", 0, "y");
+    var g = pickIn(RB, ev, J.ghosts, MRULE, "erase", 0, "y");
     if (g && g.kind === "cube"){
       TAPPED = -1;
       UI.tapNote = "A cube is missing here.";
@@ -2749,7 +3150,12 @@
        word, which is the one thing the numbered views exist to prevent. */
     if (r && r.id !== lastRoundId){
       lastRoundId = r.id;
-      setView(0, true);
+      /* with the grid both phones start on VIEW 1, so they agree before a
+         word is said. Without it each phone starts at its own random quarter
+         turn: agreeing which way is which is part of the job */
+      applyMode(r.grid);
+      setView(r.grid ? 0 : rnd4(), true);
+      VIEWERS.forEach(function(V){ V.aimAt(plateMiddle(), true); });
       TOOL = "place"; paintSwatches();
       var role = myRole();
       if (role && !seenRole(role)) ROLECARD = role;
@@ -2757,7 +3163,8 @@
     if (!r) lastRoundId = null;
     if (!r){ BUILD = []; lastBuildSig = ""; lastDesign = ""; TAPPED = -1; UI.tapNote = ""; }
     else if (!amArchitect() && !BUILD.length && r.build && r.build.length)
-      BUILD = r.build.slice();            // a reload, or this phone rejoining
+    { BUILD = r.build.slice();            // a reload, or this phone rejoining
+      if (!r.grid) BV.aimAt(centreOf(BUILD), true); }
     maybeStart();
     maybeSave();
     maybeReturn();
@@ -2766,10 +3173,11 @@
   /* ---------- boot ---------- */
   function boot(){
     try { THEME = localStorage.getItem("relay.m.theme") || "light"; } catch(e){}
+    try { SHADE = localStorage.getItem("relay.m.shade") !== "off"; } catch(e){}
 
-    BV = makeViewer(el("cvPlay"),  { fov:46 });
-    RD = makeViewer(el("cvDesRev"), { fov:46 });
-    RB = makeViewer(el("cvBldRev"), { fov:46 });
+    BV = makeModeViewer(el("cvPlay"),  { fov:46 });
+    RD = makeModeViewer(el("cvDesRev"), { fov:46 });
+    RB = makeModeViewer(el("cvBldRev"), { fov:46 });
 
     on("goCreate", function(){ show("scCreate"); UI.screen = "scCreate"; });
     on("goJoin",   function(){ show("scJoin");   UI.screen = "scJoin"; });
@@ -2790,6 +3198,17 @@
        game has frozen. */
     on("dbGo", askReturn);
 
+    on("lobGridOff", function(){ pickGrid(false); });
+    on("lobGridOn",  function(){ pickGrid(true); });
+    /* SHADE, like DARK/LIGHT, belongs to this phone */
+    ["plShade","dbShade"].forEach(function(id){
+      on(id, function(){
+        SHADE = !SHADE;
+        try { localStorage.setItem("relay.m.shade", SHADE ? "on" : "off"); } catch(e){}
+        lastDesign = ""; lastBuildSig = "";
+        paint();
+      });
+    });
     on("roleArch",  function(){ pickRole("architect"); });
     on("roleBuild", function(){ pickRole("builder"); });
     on("lobReady",  pressReady);
@@ -2821,7 +3240,7 @@
     }, { passive:false });
     window.addEventListener("pointerup", gup);
     window.addEventListener("pointercancel", function(){
-      G.on = false; G.fromSwatch = false; showTarget(null); carryHide();
+      G.on = false; MODE.hold = false; G.fromSwatch = false; showTarget(null); carryHide();
     });
     el("dbBuild").addEventListener("pointerdown", function(ev){
       if (ev.target && ev.target.closest && ev.target.closest(".stageTop")) return;
@@ -2866,6 +3285,7 @@
     theme(THEME);
     setView(0);
     refit();
+    applyMode(true);          // grid until a round says otherwise; the code, not just the markup, hides SHADE
     paintSwatches();
 
     SHARED.subscribe(function(){ onState(); paint(); });
@@ -2902,6 +3322,13 @@
                  label:(el("plView")||{}).textContent };
       },
       dealFor: dealFor, tierForRound: tierForRound,
+      /* 261015.3, for the suite: put the screen in a mode, fix the random
+         start, and read back what the phone now shows */
+      mode: function(grid){ applyMode(grid); },
+      setRandom: function(f){ rnd4 = f; },
+      shade: function(){ return SHADE; },
+      nogrid: function(){ return MODE.nogrid; },
+      plateShown: function(){ return VIEWERS.map(function(V){ return V.plate.visible; }); },
       encWire: encWire, decWire: decWire, blankState: blankState,
       freshTeamState: freshTeamState
     };

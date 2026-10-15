@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Relay mobile facilitator view 261015.1</title>
+<title>Relay mobile facilitator view 261015.2</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
@@ -163,7 +163,7 @@
 <body>
 <header>
   <div class="barrow">
-    <h1>Relay mobile <em>facilitator view 261015.1</em></h1>
+    <h1>Relay mobile <em>facilitator view 261015.2</em></h1>
     <span class="readonly">read only</span>
     <label class="field" for="sess">Session
       <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
@@ -194,7 +194,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "261015.1";
+  var VERSION = "261015.2";
 
   /* ==========================================================
      1. READING WHAT THE GAME WROTE
@@ -297,7 +297,11 @@
            build itself, so a round can be re-scored later. Both blank on
            older records rather than invented. */
         game: r.build || "",
-        placed: res.placed || ""
+        placed: res.placed || "",
+        /* 261015.3 on: whether the round was played with the grid. Blank on
+           older records rather than inferred (every build before 261015.3
+           had one; the game column says which build it was) */
+        grid: res.grid === undefined ? null : !!res.grid
       });
     });
     return out;
@@ -432,6 +436,8 @@
       cell:function(r){ return el("td","num", String(r.n)); } },
     { head:"Level", key:"tier", sortVal:function(r){ return "EMH".indexOf(r.tier); },
       cell:function(r){ return el("td","dim", r.tierName); } },
+    { head:"Grid", key:"grid", sortVal:function(r){ return r.grid === null ? -1 : (r.grid ? 1 : 0); },
+      cell:function(r){ return el("td","dim", r.grid === null ? "\u2014" : (r.grid ? "on" : "off")); } },
     { head:"Status", key:"how", sortVal:function(r){ return r.how; },
       cell:function(r){
         var td = el("td");
@@ -460,7 +466,7 @@
   /* ---------- CSV, for a spreadsheet afterwards ---------- */
   function csvOf(rounds){
     var head = ["team","host","guest","round","level","status","seconds",
-                "verdict","wrong","design","startedAt","game","placed"];
+                "verdict","wrong","design","startedAt","grid","game","placed"];
     var q = function(v){
       v = (v === null || v === undefined) ? "" : String(v);
       return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
@@ -471,6 +477,7 @@
                   r.elapsedMs === null ? "" : Math.round(r.elapsedMs/1000),
                   r.verdict, r.wrong === null ? "" : r.wrong, r.designId,
                   r.startedAt ? new Date(r.startedAt).toISOString() : "",
+                  r.grid === null || r.grid === undefined ? "" : (r.grid ? "on" : "off"),
                   r.game, r.placed
                  ].map(q).join(","));
     });
