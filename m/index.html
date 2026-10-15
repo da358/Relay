@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay 261015.1</title>
+<title>Relay 261015.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -358,7 +358,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "261015.1";
+  var VERSION = "261015.2";
 
   /* ---------- error surface ----------
      Report where it happened and keep running. Silent death is what turned one
@@ -2380,6 +2380,7 @@
     el("dbClock").textContent = mmss(roundMs());
 
     var v = verdictOf(d, b), df = diffOf(d, b);
+    DBGHOSTS = df.ghosts;
     var flags = {}, styles = {};
     Object.keys(df.build).forEach(function(k){
       flags[k] = "extra";
@@ -2416,6 +2417,12 @@
 
   /* which cube the debrief has been asked about */
   var TAPPED = -1;
+  /* the ghosts the debrief last DREW. The picker answers "which of these did
+     the finger hit" by identity, the very object drawn, so a tap must ask
+     about the ghosts that are on screen, not a list worked out afresh.
+     261015.1 asked about a fresh list, because diffOf now makes new ghosts
+     each time it lines a build up, and a tapped ghost answered nothing. */
+  var DBGHOSTS = [];
   var WHYWORDS = { extra:"This cube should not be here.",
                    color:"Right place, wrong color.",
                    facing:"Right place, wrong way up." };
@@ -2684,7 +2691,7 @@
     /* the ghosts are in the same scene but not in the build, so the picker
        finds nothing for them. Ask again against the ghost list, or a missing
        cube would be the one kind of mistake you cannot enquire about. */
-    var g = pickIn(RB, ev, df.ghosts, MRULE, "erase", 0, "y");
+    var g = pickIn(RB, ev, DBGHOSTS, MRULE, "erase", 0, "y");
     if (g && g.kind === "cube"){
       TAPPED = -1;
       UI.tapNote = "A cube is missing here.";
