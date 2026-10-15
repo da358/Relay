@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Relay no-grid testbed 261015.1</title>
+<title>Relay no-grid testbed 261015.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
@@ -45,9 +45,11 @@
   #top{ flex:0 0 auto; padding:8px 10px; border-bottom:1px solid var(--rule); }
   #top .row{ display:flex; align-items:center; gap:6px; margin-bottom:8px; }
   #dNum{ min-width:104px; }
-  #dTier{ color:var(--dim); font-size:calc(13px * var(--ts)); font-weight:700; padding-left:4px; }
-  #ver{ flex:1 1 auto; text-align:right; color:var(--dim); font-size:calc(10px * var(--ts));
-        padding-right:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  #top .grow{ flex:1 1 auto; }
+  button.k.tog{ color:var(--dim); }
+  button.k.tog.on{ background:var(--cyan); color:#fff; border-color:var(--cyan); }
+  #ver{ position:absolute; right:10px; bottom:6px; z-index:2; pointer-events:none;
+        color:var(--dim); font-size:calc(10px * var(--ts)); }
 
   .pane{ display:none; flex-direction:column; flex:1 1 auto; min-height:0; }
   .stage{ position:relative; background:var(--panel); touch-action:none; overflow:hidden;
@@ -116,10 +118,10 @@
 <header id="top">
   <div class="row">
     <button class="k" id="dPrev" aria-label="Previous design">&lsaquo;</button>
-    <button class="k" id="dNum">Design 1</button>
+    <button class="k" id="dNum">1 &middot; easy</button>
     <button class="k" id="dNext" aria-label="Next design">&rsaquo;</button>
-    <span id="dTier"></span>
-    <span id="ver"></span>
+    <span class="grow"></span>
+    <button class="k tog on" id="floorB" aria-label="Footprint shading">SHADE</button>
     <button class="k" id="themeB">DARK</button>
   </div>
   <div class="seg">
@@ -147,6 +149,7 @@
       <span class="grow"></span>
       <button class="k" id="bClear">CLEAR</button>
     </div>
+    <span id="ver"></span>
     <div class="toast" id="capNote">Too wide. Every design fits within 4 &times; 4.</div>
     <canvas id="cvBuild"></canvas>
   </div>
@@ -186,7 +189,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "261015.1";
+  var VERSION = "261015.2";
 
   /* ---------- error surface, from the game ---------- */
   var BOOM = document.getElementById("boom"), boomSeen = {};
@@ -1545,27 +1548,26 @@
      Three things are deliberately the same as the game: the camera's
      distance and height (zoom 0.92, drop 0.55), the quarter turn and
      its duration, and the lights. What is different is the floor:
-     plain, no lines, fading out at its edges, and following the
-     camera so its edge is never reached.
+     there is none to see, only footprints under the cubes (261015.2).
 
      The camera never moves while a finger is down. A move under a
      finger would put the cube somewhere other than where it was aimed.
      ========================================================== */
-  var FLOOR = { light:0xD5DEE6, dark:0x1C2733 };
-  var FLOORMATS = [];
-  var FLOOR_SIZE = 11;
-  var FOLLOW_S = 0.11;                 // time constant of the ease; ~95% in a third of a second
-  var floorTex = null;
-  function makeFloorTex(){
-    var c = document.createElement("canvas"); c.width = c.height = 256;
-    var g = c.getContext("2d");
-    var r = g.createRadialGradient(128,128,0, 128,128,128);
-    r.addColorStop(0, "rgba(255,255,255,1)");
-    r.addColorStop(0.50, "rgba(255,255,255,0.92)");
-    r.addColorStop(1, "rgba(255,255,255,0)");
-    g.fillStyle = r; g.fillRect(0,0,256,256);
-    return new THREE.CanvasTexture(c);
-  }
+  /* 261015.2. No floor image: a faint gradient rendered as coloured speckle
+     on an iPhone and as almost nothing on an Android. Instead, by default,
+     a FOOTPRINT under every column that has a cube in it: a plain square a
+     little larger than the cube, one solid tone. A cube on the ground shows
+     a thin rim of it; a cube hanging out over nothing shows it on the floor
+     below, with a gap, which is the one thing a blank background cannot say.
+     It differs from the background in lightness, not hue, so it reads the
+     same for colour-blind players: darker in light mode, lighter in dark.
+     FLOOR switches it off, to compare against a blank background. */
+  var FEET = { light:0xC3CDD7, dark:0x2C3846 };
+  var FEETMATS = [];
+  var FLOORMODE = "feet";
+  var FOOT_SIZE = 1.2;
+  var footGeo = null;
+  var FOLLOW_S = 0.11;                 // time constant of the camera's ease; ~95% in a third of a second
   function offOf(i){
     return new THREE.Vector3(VDIR[i][0]*ORBIT, LIFT - CENTRE.y, VDIR[i][1]*ORBIT);
   }
@@ -1578,12 +1580,10 @@
     var group = new THREE.Group(); scene.add(group);
     var ghost = new THREE.Group(); ghost.visible = false; scene.add(ghost);
 
-    if (!floorTex) floorTex = makeFloorTex();
-    var fmat = new THREE.MeshBasicMaterial({ color:FLOOR[THEME], map:floorTex,
-      transparent:true, depthWrite:false });
-    FLOORMATS.push(fmat);
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), fmat);
-    floor.rotation.x = -Math.PI/2; scene.add(floor);
+    if (!footGeo) footGeo = new THREE.PlaneGeometry(FOOT_SIZE, FOOT_SIZE);
+    var feetMat = new THREE.MeshBasicMaterial({ color:FEET[THEME] });
+    FEETMATS.push(feetMat);
+    var feet = new THREE.Group(); scene.add(feet);
 
     /* the floor you can tap is much larger than the floor you can see, so a
        tap is never lost off its edge; the cap decides what is legal */
@@ -1593,7 +1593,7 @@
 
     var V = {
       canvas:canvas, ren:ren, scene:scene, cam:cam, group:group, ghost:ghost,
-      plateHit:plateHit, floor:floor, viewIx:0, glide:null, cubes:[], famk:"none",
+      plateHit:plateHit, feet:feet, viewIx:0, glide:null, cubes:[], famk:"none",
       faceMode:"top", dim:false, live:true,
       centre: new THREE.Vector3(GRID/2, CENTRE.y, GRID/2),
       centreTo: new THREE.Vector3(GRID/2, CENTRE.y, GRID/2),
@@ -1602,7 +1602,6 @@
     function place(){
       cam.position.copy(V.centre).add(V.off);
       cam.lookAt(V.centre);
-      floor.position.set(V.centre.x, 0.002, V.centre.z);
       plateHit.position.set(V.centre.x, 0, V.centre.z);
     }
     V.paint = function(cubes, famk, o){
@@ -1619,6 +1618,18 @@
       if (o.ghosts) o.ghosts.forEach(function(q){
         group.add(makeCube(q, famk, { faint: o.ghostOpacity || 0.30 }));
       });
+      /* one footprint per column, for cubes that are there; never for a
+         ghost, which is a cube that is NOT there */
+      while (feet.children.length) feet.remove(feet.children[0]);
+      if (FLOORMODE === "feet"){
+        var seen = {};
+        cubes.forEach(function(q){
+          var k = q.x + "," + q.z; if (seen[k]) return; seen[k] = 1;
+          var m = new THREE.Mesh(footGeo, feetMat);
+          m.rotation.x = -Math.PI/2; m.position.set(q.x + 0.5, 0.003, q.z + 0.5);
+          feet.add(m);
+        });
+      }
     };
     V.aimAt = function(c, snap){
       if (!c) return;
@@ -1788,8 +1799,8 @@
   }
   function paint(){
     var d = design();
-    el("dNum").textContent = "Design " + (DES + 1);
-    el("dTier").textContent = TIERNAME[d.tier] || "";
+    el("dNum").textContent = (DES + 1) + " \u00b7 " + (TIERNAME[d.tier] || "");
+    el("floorB").classList.toggle("on", FLOORMODE === "feet");
     [["tabArch","arch","pnArch"],["tabBuild","build","pnBuild"],["tabCheck","check","pnCheck"]]
       .forEach(function(x){
         el(x[0]).classList.toggle("on", TAB === x[1]);
@@ -1805,7 +1816,7 @@
   function theme(next){
     THEME = next;
     document.documentElement.setAttribute("data-theme", next);
-    FLOORMATS.forEach(function(m){ m.color.setHex(FLOOR[next]); });
+    FEETMATS.forEach(function(m){ m.color.setHex(FEET[next]); });
     el("themeB").textContent = next === "light" ? "DARK" : "LIGHT";
   }
 
@@ -1821,6 +1832,12 @@
   /* what the finger means. If the cap refuses a cell that would otherwise be
      fine, say so, rather than refusing in silence. */
   function mTarget(ev){
+    /* 261015.2: only ever from inside the stage. The tappable floor is now
+       far bigger than the screen, so an aim point just below the stage (a
+       plain tap on a swatch puts it there, because the cube is drawn above
+       the fingertip) found floor out near the camera and placed a cube on
+       it. The game's plate-sized floor had been hiding this rule. */
+    if (!inStage(ev)) return null;
     var a = aim(ev), pt = { clientX:a.x, clientY:a.y };
     var tool = TOOL === "erase" ? "erase" : "place";
     var t = pickIn(BV, pt, BUILD, MRULE, tool, 0, COLOUR);
@@ -1941,6 +1958,7 @@
       if (n >= 1 && n <= MLIB.length) setDesign(n - 1);
     });
     on("themeB", function(){ theme(THEME === "light" ? "dark" : "light"); });
+    on("floorB", function(){ FLOORMODE = FLOORMODE === "feet" ? "none" : "feet"; paint(); });
     on("tabArch",  function(){ setTab("arch"); });
     on("tabBuild", function(){ setTab("build"); });
     on("tabCheck", function(){ setTab("check"); });
@@ -2007,6 +2025,8 @@
     })(last);
 
     window.RELAY_TB = {
+      floor: function(){ return FLOORMODE; },
+      feet: function(){ return { arch:AV.feet.children.length, build:BV.feet.children.length }; },
       stamp:VERSION, cap:CAP, designs:MLIB.length, turnMs:TURN_MS,
       fitZoom:FIT.zoom, fitDrop:FIT.drop, follow:FOLLOW_S,
       state: function(){ return { des:DES, tab:TAB, build:BUILD.slice(), tool:TOOL,
