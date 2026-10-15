@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Relay mobile facilitator view 260909.3</title>
+<title>Relay mobile facilitator view 261015.1</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
@@ -163,7 +163,7 @@
 <body>
 <header>
   <div class="barrow">
-    <h1>Relay mobile <em>facilitator view 260909.3</em></h1>
+    <h1>Relay mobile <em>facilitator view 261015.1</em></h1>
     <span class="readonly">read only</span>
     <label class="field" for="sess">Session
       <input id="sess" maxlength="12" autocomplete="off" spellcheck="false"
@@ -194,7 +194,7 @@
 <script>
 (function(){
   "use strict";
-  var VERSION = "260909.3";
+  var VERSION = "261015.1";
 
   /* ==========================================================
      1. READING WHAT THE GAME WROTE
@@ -291,7 +291,13 @@
         elapsedMs: (rd.elapsedMs === undefined ? null : rd.elapsedMs),
         verdict: res.verdict || "\u2014",
         wrong: (res.wrong === undefined ? null : res.wrong),
-        submitted: !!res.submitted
+        submitted: !!res.submitted,
+        /* 261015.1: which game build played the round — builds before
+           261015.1 counted "wrong" in place rather than lined up — and the
+           build itself, so a round can be re-scored later. Both blank on
+           older records rather than invented. */
+        game: r.build || "",
+        placed: res.placed || ""
       });
     });
     return out;
@@ -454,7 +460,7 @@
   /* ---------- CSV, for a spreadsheet afterwards ---------- */
   function csvOf(rounds){
     var head = ["team","host","guest","round","level","status","seconds",
-                "verdict","wrong","design","startedAt"];
+                "verdict","wrong","design","startedAt","game","placed"];
     var q = function(v){
       v = (v === null || v === undefined) ? "" : String(v);
       return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
@@ -464,7 +470,8 @@
       lines.push([r.code, r.host, r.guest, r.n, r.tierName, r.how,
                   r.elapsedMs === null ? "" : Math.round(r.elapsedMs/1000),
                   r.verdict, r.wrong === null ? "" : r.wrong, r.designId,
-                  r.startedAt ? new Date(r.startedAt).toISOString() : ""
+                  r.startedAt ? new Date(r.startedAt).toISOString() : "",
+                  r.game, r.placed
                  ].map(q).join(","));
     });
     return lines.join("\n");
